@@ -1,7 +1,26 @@
 # CC-Switch for AiCodeWith
 
 [![Built with Tauri](https://img.shields.io/badge/built%20with-Tauri%202-orange.svg)](https://tauri.app/)
-[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)](https://github.com/farion1231/cc-switch/releases)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)](https://github.com/Bianshumeng/aicodewith-cc-switch/releases)
+[![GitHub release](https://img.shields.io/github/v/release/Bianshumeng/aicodewith-cc-switch)](https://github.com/Bianshumeng/aicodewith-cc-switch/releases/latest)
+
+## 📥 立即下载
+
+[![Download Latest Release](https://img.shields.io/badge/📥%20下载最新版本-v1.0.4-blue?style=for-the-badge)](https://github.com/Bianshumeng/aicodewith-cc-switch/releases/latest)
+
+| 操作系统 | 下载链接 | 说明 |
+|---------|---------|------|
+| 🪟 **Windows** | [Setup.msi](https://github.com/Bianshumeng/aicodewith-cc-switch/releases/latest/download/CC-Switch-Setup.msi) · [Portable.zip](https://github.com/Bianshumeng/aicodewith-cc-switch/releases/latest/download/CC-Switch-Windows-Portable.zip) | 安装版 / 绿色版 |
+| 🍎 **macOS** | [macOS.zip](https://github.com/Bianshumeng/aicodewith-cc-switch/releases/latest/download/CC-Switch-macOS.zip) | 支持Intel和Apple Silicon |
+| 🐧 **Linux** | [.deb](https://github.com/Bianshumeng/aicodewith-cc-switch/releases/latest/download/CC-Switch-Linux.deb) · [AppImage](https://github.com/Bianshumeng/aicodewith-cc-switch/releases/latest/download/CC-Switch-Linux.AppImage) | Debian/Ubuntu / 通用格式 |
+
+### 🚀 快速开始
+
+1. **下载安装包** - 点击上方对应系统的下载链接
+2. **安装应用** - 运行下载的安装包（Windows .msi / macOS 解压后拖拽到Applications / Linux 安装 .deb 或运行 AppImage）
+3. **获取API Token** - 访问 [AiCodeWith.com](https://aicodewith.com) 注册并获取API Token
+4. **配置切换** - 打开应用，选择预置的"AiCodeWith"供应商，填入API Token，点击切换
+5. **开始使用** - 重启Claude Code，即可享受稳定的API中转服务
 
 > **注意**：这是 [原始CC-Switch项目](https://github.com/farion1231/cc-switch) 的fork版本，专为AiCodeWith中转站服务定制。
 
