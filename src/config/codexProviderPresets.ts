@@ -1,0 +1,47 @@
+/**
+ * Codex 预设供应商配置模板
+ */
+import { ProviderCategory } from "../types";
+
+export interface CodexProviderPreset {
+  name: string;
+  websiteUrl: string;
+  auth: Record<string, any>; // 将写入 ~/.codex/auth.json
+  config: string; // 将写入 ~/.codex/config.toml（TOML 字符串）
+  isOfficial?: boolean; // 标识是否为官方预设
+  category?: ProviderCategory; // 新增：分类
+}
+
+export const codexProviderPresets: CodexProviderPreset[] = [
+  {
+    name: "Codex官方",
+    websiteUrl: "https://chatgpt.com/codex",
+    isOfficial: true,
+    category: "official",
+    // 官方的 key 为null
+    auth: {
+      OPENAI_API_KEY: null,
+    },
+    config: ``,
+  },
+  {
+    name: "aicodewith",
+    websiteUrl: "https://aicodewith.com/",
+    category: "third_party",
+    // aicodewith 一般通过 API Key；请将占位符替换为你的实际 key
+    auth: {
+      OPENAI_API_KEY: "sk-your-api-key-here",
+    },
+    config: `model_provider = "aicodewith"
+model = "gpt-5-codex"
+model_reasoning_effort = "high"
+disable_response_storage = true
+preferred_auth_method = "apikey"
+
+
+[model_providers.aicodewith]
+name = "aicodewith"
+base_url = "https://api.jiuwanliguoxue.com/chatgpt/v1"
+wire_api = "responses"`,
+  },
+];
