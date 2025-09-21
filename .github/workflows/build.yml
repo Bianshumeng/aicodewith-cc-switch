@@ -1,0 +1,145 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows
+          - os: ubuntu-22.04
+            platform: linux
+          - os: macos-latest
+            platform: macos
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Add macOS targets
+        if: matrix.platform == 'macos'
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+
+      - name: Install Linux dependencies
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            libgtk-3-dev \
+            libwebkit2gtk-4.0-dev \
+            libssl-dev \
+            pkg-config \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build Tauri App
+        run: pnpm tauri build
+
+      - name: Prepare Release Assets
+        shell: bash
+        run: |
+          mkdir -p release-assets
+
+          if [ "${{ matrix.platform }}" == "windows" ]; then
+            # Windows MSI installer
+            find src-tauri/target/release/bundle/msi -name "*.msi" -exec cp {} release-assets/CC-Switch-Setup.msi \;
+            # Windows portable
+            if [ -f "src-tauri/target/release/cc-switch.exe" ]; then
+              mkdir -p temp-portable
+              cp src-tauri/target/release/cc-switch.exe temp-portable/
+              cd temp-portable && zip -r ../release-assets/CC-Switch-Windows-Portable.zip . && cd ..
+              rm -rf temp-portable
+            fi
+          elif [ "${{ matrix.platform }}" == "macos" ]; then
+            # macOS .app bundle
+            find src-tauri/target/release/bundle/macos -name "*.app" | head -1 | xargs -I {} sh -c 'cd "$(dirname "{}")" && zip -r "$GITHUB_WORKSPACE/release-assets/CC-Switch-macOS.zip" "$(basename "{}")"'
+          elif [ "${{ matrix.platform }}" == "linux" ]; then
+            # Linux .deb package
+            find src-tauri/target/release/bundle/deb -name "*.deb" -exec cp {} release-assets/CC-Switch-Linux.deb \;
+            # Linux AppImage
+            find src-tauri/target/release/bundle/appimage -name "*.AppImage" -exec cp {} release-assets/CC-Switch-Linux.AppImage \;
+          fi
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cc-switch-${{ matrix.platform }}
+          path: release-assets/*
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-assets
+          find artifacts -type f -exec cp {} release-assets/ \;
+          ls -la release-assets/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: CC-Switch for AiCodeWith ${{ github.ref_name }}
+          body: |
+            ## CC-Switch for AiCodeWith ${{ github.ref_name }}
+
+            专为 [AiCodeWith中转站](https://aicodewith.com/) 定制的Claude Code & Codex 供应商切换工具
+
+            ### 🚀 特色功能
+
+            - 🚀 预置AiCodeWith供应商配置，开箱即用
+            - 🌐 专为国内用户优化的Claude API中转服务
+            - ⚡ 支持在官方登录和AiCodeWith服务间一键切换
+            - 🔒 基于成熟的CC-Switch架构，保障配置安全
+
+            ### 📥 下载安装
+
+            - **Windows**: `CC-Switch-Setup.msi`（安装版）；`CC-Switch-Windows-Portable.zip`（绿色版）
+            - **macOS**: `CC-Switch-macOS.zip`（解压即用）
+            - **Linux**: `CC-Switch-Linux.deb`（DEB包）；`CC-Switch-Linux.AppImage`（通用格式）
+
+            ### 🎯 使用说明
+
+            1. 下载对应系统的安装包
+            2. 访问 [AiCodeWith](https://aicodewith.com/) 获取API Token
+            3. 在应用中选择预置的"AiCodeWith"供应商并填入Token
+            4. 一键切换即可使用
+
+            ---
+            **基于开源项目**：Fork自 [farion1231/cc-switch](https://github.com/farion1231/cc-switch)，遵循MIT许可证
+          files: release-assets/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
