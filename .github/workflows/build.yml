@@ -19,6 +19,8 @@ jobs:
             platform: windows
           - os: ubuntu-22.04
             platform: linux
+          - os: macos-latest
+            platform: macos
 
     steps:
       - name: Checkout
@@ -31,6 +33,10 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Add macOS targets
+        if: matrix.platform == 'macos'
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
 
 
       - name: Install Linux dependencies
@@ -72,6 +78,9 @@ jobs:
               cd temp-portable && zip -r ../release-assets/CC-Switch-Windows-Portable.zip . && cd ..
               rm -rf temp-portable
             fi
+          elif [ "${{ matrix.platform }}" == "macos" ]; then
+            # macOS .app bundle
+            find src-tauri/target/release/bundle/macos -name "*.app" | head -1 | xargs -I {} sh -c 'cd "$(dirname "{}")" && zip -r "$GITHUB_WORKSPACE/release-assets/CC-Switch-macOS.zip" "$(basename "{}")"'
           elif [ "${{ matrix.platform }}" == "linux" ]; then
             # Linux .deb package
             find src-tauri/target/release/bundle/deb -name "*.deb" -exec cp {} release-assets/CC-Switch-Linux.deb \;
