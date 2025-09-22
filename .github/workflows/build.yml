@@ -9,9 +9,49 @@ on:
 permissions:
   contents: write
 
+env:
+  CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+  CARGO_NET_RETRY: "10"
+  CARGO_NET_TIMEOUT: "120"
+  CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+  RUST_BACKTRACE: "1"
+
 jobs:
+  prefetch-cargo:
+    name: Prefetch Cargo (offline cache)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          profile: minimal
+
+      - name: Prefetch crates (locked)
+        env:
+          CARGO_HOME: ${{ runner.temp }}/cargo-home
+        working-directory: src-tauri
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p "$CARGO_HOME"
+          cargo fetch --locked
+          tar -C "$CARGO_HOME" -czf cargo-home.tgz .
+          mv cargo-home.tgz "$GITHUB_WORKSPACE/"
+
+      - name: Upload cargo-home artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cargo-home
+          path: cargo-home.tgz
+          if-no-files-found: error
+
   build:
     runs-on: ${{ matrix.os }}
+    needs: prefetch-cargo
     strategy:
       matrix:
         include:
@@ -21,6 +61,9 @@ jobs:
             platform: linux
           - os: macos-latest
             platform: macos
+    env:
+      CARGO_HOME: ${{ runner.temp }}/cargo-home
+      CARGO_NET_OFFLINE: "true"
 
     steps:
       - name: Checkout
@@ -33,6 +76,30 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          profile: minimal
+
+      - name: Download cargo-home artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: cargo-home
+          path: ${{ runner.temp }}
+
+      - name: Restore Cargo HOME (offline)
+        shell: bash
+        env:
+          CARGO_HOME: ${{ runner.temp }}/cargo-home
+        run: |
+          set -euxo pipefail
+          mkdir -p "$CARGO_HOME"
+          tar -C "$CARGO_HOME" -xzf "${{ runner.temp }}/cargo-home.tgz"
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: ./src-tauri
+          shared-key: cc-switch
+          cache-on-failure: true
 
       - name: Add macOS targets
         if: matrix.platform == 'macos'
@@ -42,8 +109,8 @@ jobs:
       - name: Install Linux dependencies
         if: matrix.platform == 'linux'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
+          sudo apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 update
+          sudo apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 install -y \
             build-essential \
             libgtk-3-dev \
             libwebkit2gtk-4.0-dev \
