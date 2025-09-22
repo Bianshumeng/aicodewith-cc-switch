@@ -60,6 +60,7 @@ jobs:
         run: pnpm install
 
       - name: Build Tauri App
+        shell: bash
         run: |
           if [ "${{ matrix.platform }}" = "macos" ]; then
             pnpm tauri build --target universal-apple-darwin
@@ -68,6 +69,7 @@ jobs:
           fi
 
       - name: Prepare Release Assets
+        shell: bash
         run: |
           mkdir -p release-assets
 
