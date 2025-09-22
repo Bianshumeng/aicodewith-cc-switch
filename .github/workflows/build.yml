@@ -41,10 +41,10 @@ jobs:
         run: |
           set -euxo pipefail
           mkdir -p "$CARGO_HOME"
-          cargo fetch --locked\r
-          cargo fetch --locked --target aarch64-apple-darwin\r
-          cargo fetch --locked --target x86_64-apple-darwin\r
-          cargo fetch --locked --target x86_64-pc-windows-msvc\r
+          cargo fetch --locked
+          cargo fetch --locked --target aarch64-apple-darwin
+          cargo fetch --locked --target x86_64-apple-darwin
+          cargo fetch --locked --target x86_64-pc-windows-msvc
           tar -C "$CARGO_HOME" -czf cargo-home.tgz .
           mv cargo-home.tgz "$GITHUB_WORKSPACE/"
 
@@ -117,10 +117,10 @@ jobs:
           for i in {1..5}; do
             echo "Attempt $i/5: Adding macOS targets..."
             if rustup target add aarch64-apple-darwin x86_64-apple-darwin; then
-              echo "�?Successfully added macOS targets"
+              echo "�?Successfully added macOS targets"
               break
             elif [ $i -eq 5 ]; then
-              echo "�?Failed to add macOS targets after 5 attempts"
+              echo "�?Failed to add macOS targets after 5 attempts"
               exit 1
             else
               echo "⚠️ Attempt $i failed, retrying in 20 seconds..."
@@ -233,23 +233,23 @@ jobs:
           body: |
             ## CC-Switch for AiCodeWith ${{ github.ref_name }}
 
-            专为 [AiCodeWith中转站](https://aicodewith.com/) 定制的Claude Code & Codex 供应商切换工�?
+            专为 [AiCodeWith中转站](https://aicodewith.com/) 定制的Claude Code & Codex 供应商切换工�?
             ### 🚀 特色功能
 
-            - 🚀 预置AiCodeWith供应商配置，开箱即�?            - 🌐 专为国内用户优化的Claude API中转服务
-            - �?支持在官方登录和AiCodeWith服务间一键切�?            - 🔒 基于成熟的CC-Switch架构，保障配置安�?
+            - 🚀 预置AiCodeWith供应商配置，开箱即�?            - 🌐 专为国内用户优化的Claude API中转服务
+            - �?支持在官方登录和AiCodeWith服务间一键切�?            - 🔒 基于成熟的CC-Switch架构，保障配置安�?
             ### 📥 下载安装
 
-            - **Windows**: `CC-Switch-Setup.msi`（安装版）；`CC-Switch-Windows-Portable.zip`（绿色版�?            - **macOS**: `CC-Switch-macOS.zip`（解压即用）
-            - **Linux**: `CC-Switch-Linux.deb`（DEB包）；`CC-Switch-Linux.AppImage`（通用格式�?
+            - **Windows**: `CC-Switch-Setup.msi`（安装版）；`CC-Switch-Windows-Portable.zip`（绿色版�?            - **macOS**: `CC-Switch-macOS.zip`（解压即用）
+            - **Linux**: `CC-Switch-Linux.deb`（DEB包）；`CC-Switch-Linux.AppImage`（通用格式�?
             ### 🎯 使用说明
 
             1. 下载对应系统的安装包
             2. 访问 [AiCodeWith](https://aicodewith.com/) 获取API Token
-            3. 在应用中选择预置�?AiCodeWith"供应商并填入Token
-            4. 一键切换即可使�?
+            3. 在应用中选择预置�?AiCodeWith"供应商并填入Token
+            4. 一键切换即可使�?
             ---
-            **基于开源项�?*：Fork�?[farion1231/cc-switch](https://github.com/farion1231/cc-switch)，遵循MIT许可�?          files: release-assets/*
+            **基于开源项�?*：Fork�?[farion1231/cc-switch](https://github.com/farion1231/cc-switch)，遵循MIT许可�?          files: release-assets/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

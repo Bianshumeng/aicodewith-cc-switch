@@ -42,10 +42,10 @@ jobs:
         run: |
           set -euxo pipefail
           mkdir -p "$CARGO_HOME"
-          cargo fetch --locked\r
-          cargo fetch --locked --target aarch64-apple-darwin\r
-          cargo fetch --locked --target x86_64-apple-darwin\r
-          cargo fetch --locked --target x86_64-pc-windows-msvc\r
+          cargo fetch --locked
+          cargo fetch --locked --target aarch64-apple-darwin
+          cargo fetch --locked --target x86_64-apple-darwin
+          cargo fetch --locked --target x86_64-pc-windows-msvc
           tar -C "$CARGO_HOME" -czf cargo-home.tgz .
           mv cargo-home.tgz "$GITHUB_WORKSPACE/"
 
@@ -116,13 +116,13 @@ jobs:
           for i in {1..5}; do
             echo "Attempt $i/5: Adding macOS targets..."
             if rustup target add aarch64-apple-darwin x86_64-apple-darwin; then
-              echo "é‰?Successfully added macOS targets"
+              echo "ï¿½?Successfully added macOS targets"
               break
             elif [ $i -eq 5 ]; then
-              echo "é‰?Failed to add macOS targets after 3 attempts"
+              echo "ï¿½?Failed to add macOS targets after 3 attempts"
               exit 1
             else
-              echo "éˆ¿ç‹…ç¬?Attempt $i failed, retrying in 10 seconds..."
+              echo "éˆ¿ç‹…ï¿½?Attempt $i failed, retrying in 10 seconds..."
               sleep 20
             fi
           done
