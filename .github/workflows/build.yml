@@ -139,16 +139,31 @@ jobs:
 
       - name: Install Linux dependencies
         if: matrix.platform == 'linux'
+        shell: bash
         run: |
+          set -euxo pipefail
           sudo apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 update
+          # Base toolchain and libs
           sudo apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 install -y \
             build-essential \
-            libgtk-3-dev \
-            libwebkit2gtk-4.0-dev \
-            libssl-dev \
             pkg-config \
+            curl \
+            wget \
+            file \
+            patchelf \
+            squashfs-tools \
+            libssl-dev \
+            libgtk-3-dev \
             libayatana-appindicator3-dev \
-            librsvg2-dev
+            librsvg2-dev \
+            libfuse2
+          # WebKit2GTK (prefer 4.0 on Ubuntu 22.04; otherwise try 4.1 then 4.0)
+          if grep -q 'VERSION_ID="22.04"' /etc/os-release; then
+            sudo apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 install -y libwebkit2gtk-4.0-dev || true
+          else
+            sudo apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 install -y libwebkit2gtk-4.1-dev \
+              || sudo apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 install -y libwebkit2gtk-4.0-dev
+          fi
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
