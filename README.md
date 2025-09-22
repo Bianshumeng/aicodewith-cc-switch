@@ -6,13 +6,13 @@
 
 ## 📥 立即下载
 
-[![Download Latest Release](https://img.shields.io/badge/📥%20下载最新版本-v1.0.4-blue?style=for-the-badge)](https://github.com/Bianshumeng/aicodewith-cc-switch/releases/latest)
+[![Download Latest Release](https://img.shields.io/badge/📥%20下载最新版本-v1.0.4-blue?style=for-the-badge)](https://github.com/Bianshumeng/aicodewith-cc-switch/releases)
 
 | 操作系统 | 下载链接 | 说明 |
 |---------|---------|------|
-| 🪟 **Windows** | [Setup.msi](https://github.com/Bianshumeng/aicodewith-cc-switch/releases/latest/download/CC-Switch-Setup.msi) · [Portable.zip](https://github.com/Bianshumeng/aicodewith-cc-switch/releases/latest/download/CC-Switch-Windows-Portable.zip) | 安装版 / 绿色版 |
-| 🍎 **macOS** | [macOS.zip](https://github.com/Bianshumeng/aicodewith-cc-switch/releases/latest/download/CC-Switch-macOS.zip) | 支持Intel和Apple Silicon |
-| 🐧 **Linux** | [.deb](https://github.com/Bianshumeng/aicodewith-cc-switch/releases/latest/download/CC-Switch-Linux.deb) · [AppImage](https://github.com/Bianshumeng/aicodewith-cc-switch/releases/latest/download/CC-Switch-Linux.AppImage) | Debian/Ubuntu / 通用格式 |
+| 🪟 **Windows** | [下载安装包](https://github.com/Bianshumeng/aicodewith-cc-switch/releases) | 安装版 (.msi) / 绿色版 (.zip) |
+| 🍎 **macOS** | [下载安装包](https://github.com/Bianshumeng/aicodewith-cc-switch/releases) | 支持Intel和Apple Silicon |
+| 🐧 **Linux** | [下载安装包](https://github.com/Bianshumeng/aicodewith-cc-switch/releases) | Debian/Ubuntu (.deb) / 通用格式 (AppImage) |
 
 ### 🚀 快速开始
 
