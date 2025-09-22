@@ -105,17 +105,17 @@ jobs:
         shell: bash
         run: |
           set -e
-          for i in {1..3}; do
-            echo "Attempt $i/3: Adding macOS targets..."
+          for i in {1..5}; do
+            echo "Attempt $i/5: Adding macOS targets..."
             if rustup target add aarch64-apple-darwin x86_64-apple-darwin; then
-              echo "✅ Successfully added macOS targets"
+              echo "�?Successfully added macOS targets"
               break
-            elif [ $i -eq 3 ]; then
-              echo "❌ Failed to add macOS targets after 3 attempts"
+            elif [ $i -eq 5 ]; then
+              echo "�?Failed to add macOS targets after 3 attempts"
               exit 1
             else
               echo "⚠️ Attempt $i failed, retrying in 10 seconds..."
-              sleep 10
+              sleep 20
             fi
           done
 
@@ -128,12 +128,12 @@ jobs:
           # Retry apt operations with backoff
           retry_cmd() {
             local cmd="$*"
-            for i in {1..3}; do
+            for i in {1..5}; do
               echo "Attempt $i/3: $cmd"
               if eval "$cmd"; then
                 return 0
-              elif [ $i -eq 3 ]; then
-                echo "❌ Command failed after 3 attempts: $cmd"
+              elif [ $i -eq 5 ]; then
+                echo "�?Command failed after 3 attempts: $cmd"
                 return 1
               else
                 echo "⚠️ Attempt $i failed, retrying in 5 seconds..."
@@ -142,9 +142,9 @@ jobs:
             done
           }
 
-          retry_cmd "sudo apt-get update"
+          retry_cmd "sudo apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 update"
           # Core build tools and pkg-config
-          retry_cmd "sudo apt-get install -y --no-install-recommends \
+          retry_cmd "sudo apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 install -y --no-install-recommends \
             build-essential \
             pkg-config \
             curl \
@@ -153,16 +153,16 @@ jobs:
             patchelf \
             libssl-dev"
           # GTK/GLib stack for gdk-3.0, glib-2.0, gio-2.0
-          retry_cmd "sudo apt-get install -y --no-install-recommends \
+          retry_cmd "sudo apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 install -y --no-install-recommends \
             libgtk-3-dev \
             librsvg2-dev \
             libayatana-appindicator3-dev"
           # WebKit2GTK (version differs across Ubuntu images; try 4.1 then 4.0)
-          retry_cmd "sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev" \
-            || retry_cmd "sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.0-dev"
+          retry_cmd "sudo apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 install -y --no-install-recommends libwebkit2gtk-4.1-dev" \
+            || retry_cmd "sudo apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 install -y --no-install-recommends libwebkit2gtk-4.0-dev"
           # libsoup also changed major version; prefer 3.0 with fallback to 2.4
-          retry_cmd "sudo apt-get install -y --no-install-recommends libsoup-3.0-dev" \
-            || retry_cmd "sudo apt-get install -y --no-install-recommends libsoup2.4-dev"
+          retry_cmd "sudo apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 install -y --no-install-recommends libsoup-3.0-dev" \
+            || retry_cmd "sudo apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 install -y --no-install-recommends libsoup2.4-dev"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
@@ -188,44 +188,40 @@ jobs:
       - name: Prepare Tauri signing key
         shell: bash
         run: |
-          # 检查 Secret 是否存在，如果没有则跳过签名
+          # 检�?Secret 是否存在，如果没有则跳过签名
           if [ -z "${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}" ]; then
-            echo "⚠️ TAURI_SIGNING_PRIVATE_KEY Secret 未设置，将跳过代码签名" >&2
+            echo "⚠️ TAURI_SIGNING_PRIVATE_KEY Secret 未设置，将跳过代码签�? >&2
             echo "这不影响应用程序的构建和功能，只是安装包不会包含代码签名" >&2
             echo "SKIP_SIGNING=true" >> "$GITHUB_ENV"
             exit 0
           fi
           
           RAW="${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}"
-          # 目标：提供正确的私钥“文件路径”给 Tauri CLI，避免内容解码歧义
-          KEY_PATH="$RUNNER_TEMP/tauri_signing.key"
+          # 目标：提供正确的私钥“文件路径”给 Tauri CLI，避免内容解码歧�?          KEY_PATH="$RUNNER_TEMP/tauri_signing.key"
           # 情况 1：原始两行文本（第一行以 "untrusted comment:" 开头）
           if echo "$RAW" | head -n1 | grep -q '^untrusted comment:'; then
             printf '%s\n' "$RAW" > "$KEY_PATH"
-            echo "✅ 使用原始两行密钥文件格式"
+            echo "�?使用原始两行密钥文件格式"
           else
             # 情况 2：整体被 base64 包裹（解包后应当是两行）
             if DECODED=$(printf '%s' "$RAW" | (base64 --decode 2>/dev/null || base64 -D 2>/dev/null)) \
                && echo "$DECODED" | head -n1 | grep -q '^untrusted comment:'; then
               printf '%s\n' "$DECODED" > "$KEY_PATH"
-              echo "✅ 成功解码 base64 包裹密钥，已还原为两行文件"
+              echo "�?成功解码 base64 包裹密钥，已还原为两行文�?
             else
-              # 情况 3：已是第二行（纯 Base64 一行）→ 构造两行文件
-              if echo "$RAW" | grep -Eq '^[A-Za-z0-9+/=]+$'; then
+              # 情况 3：已是第二行（纯 Base64 一行）�?构造两行文�?              if echo "$RAW" | grep -Eq '^[A-Za-z0-9+/=]+$'; then
                 ONE=$(printf '%s' "$RAW" | tr -d '\r\n')
                 printf '%s\n%s\n' "untrusted comment: tauri signing key" "$ONE" > "$KEY_PATH"
-                echo "✅ 使用一行 Base64 私钥，已构造两行文件"
+                echo "�?使用一�?Base64 私钥，已构造两行文�?
               else
-                echo "❌ TAURI_SIGNING_PRIVATE_KEY 格式无法识别：既不是两行原文，也不是其 base64，亦非一行 base64" >&2
-                echo "密钥前10个字符: $(echo "$RAW" | head -c 10)..." >&2
+                echo "�?TAURI_SIGNING_PRIVATE_KEY 格式无法识别：既不是两行原文，也不是�?base64，亦非一�?base64" >&2
+                echo "密钥�?0个字�? $(echo "$RAW" | head -c 10)..." >&2
                 exit 1
               fi
             fi
           fi
           # 将“完整两行内容”作为环境变量注入（Tauri 支持传入完整私钥文本或文件路径）
-          # 使用多行写入语法，保持换行以便解析
-          # 将完整两行私钥内容进行 base64 编码，作为单行内容注入环境变量
-          if command -v base64 >/dev/null 2>&1; then
+          # 使用多行写入语法，保持换行以便解�?          # 将完整两行私钥内容进�?base64 编码，作为单行内容注入环境变�?          if command -v base64 >/dev/null 2>&1; then
             KEY_B64=$(base64 < "$KEY_PATH" | tr -d '\r\n')
           elif command -v openssl >/dev/null 2>&1; then
             KEY_B64=$(openssl base64 -A -in "$KEY_PATH")
@@ -233,14 +229,14 @@ jobs:
             KEY_B64=$(KEY_PATH="$KEY_PATH" node -e "process.stdout.write(require('fs').readFileSync(process.env.KEY_PATH).toString('base64'))")
           fi
           if [ -z "$KEY_B64" ]; then
-            echo "❌ 无法生成私钥 base64 内容" >&2
+            echo "�?无法生成私钥 base64 内容" >&2
             exit 1
           fi
           echo "TAURI_SIGNING_PRIVATE_KEY=$KEY_B64" >> "$GITHUB_ENV"
           if [ -n "${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}" ]; then
             echo "TAURI_SIGNING_PRIVATE_KEY_PASSWORD=${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}" >> $GITHUB_ENV
           fi
-          echo "✅ Tauri signing key prepared"
+          echo "�?Tauri signing key prepared"
 
       - name: Build Tauri App (macOS)
         if: runner.os == 'macOS'
@@ -250,10 +246,10 @@ jobs:
           export CARGO_NET_RETRY=10
           export CARGO_NET_TIMEOUT=30
           if [ "$SKIP_SIGNING" = "true" ]; then
-            echo "构建macOS应用（无签名）..."
+            echo "构建macOS应用（无签名�?.."
             pnpm tauri build --target universal-apple-darwin
           else
-            echo "构建macOS应用（含签名）..."
+            echo "构建macOS应用（含签名�?.."
             pnpm tauri build --target universal-apple-darwin
           fi
 
@@ -265,10 +261,10 @@ jobs:
           export CARGO_NET_RETRY=10
           export CARGO_NET_TIMEOUT=30
           if [ "$SKIP_SIGNING" = "true" ]; then
-            echo "构建Windows应用（无签名）..."
+            echo "构建Windows应用（无签名�?.."
             pnpm tauri build
           else
-            echo "构建Windows应用（含签名）..."
+            echo "构建Windows应用（含签名�?.."
             pnpm tauri build
           fi
 
@@ -280,10 +276,10 @@ jobs:
           export CARGO_NET_RETRY=10
           export CARGO_NET_TIMEOUT=30
           if [ "$SKIP_SIGNING" = "true" ]; then
-            echo "构建Linux应用（无签名）..."
+            echo "构建Linux应用（无签名�?.."
             pnpm tauri build
           else
-            echo "构建Linux应用（含签名）..."
+            echo "构建Linux应用（含签名�?.."
             pnpm tauri build
           fi
 
@@ -313,7 +309,7 @@ jobs:
           if [ "$SKIP_SIGNING" != "true" ]; then
             [ -f "$TAR_GZ.sig" ] && cp "$TAR_GZ.sig" release-assets/ || echo ".sig for macOS not found yet"
           else
-            echo "跳过macOS签名文件（无签名模式）"
+            echo "跳过macOS签名文件（无签名模式�?
           fi
           echo "macOS updater artifact copied: $(basename "$TAR_GZ")"
           if [ -n "$APP_PATH" ]; then
@@ -332,8 +328,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Force -Path release-assets | Out-Null
-          # 仅打包 MSI 安装器 + .sig（用于 Updater）
-          $msi = Get-ChildItem -Path 'src-tauri/target/release/bundle/msi' -Recurse -Include *.msi -ErrorAction SilentlyContinue | Select-Object -First 1
+          # 仅打�?MSI 安装�?+ .sig（用�?Updater�?          $msi = Get-ChildItem -Path 'src-tauri/target/release/bundle/msi' -Recurse -Include *.msi -ErrorAction SilentlyContinue | Select-Object -First 1
           if ($null -eq $msi) {
             # 兜底：全局搜索 .msi
             $msi = Get-ChildItem -Path 'src-tauri/target/release/bundle' -Recurse -Include *.msi -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -351,13 +346,12 @@ jobs:
                 Write-Warning "Signature not found for $($msi.Name)"
               }
             } else {
-              Write-Host "跳过Windows签名文件（无签名模式）"
+              Write-Host "跳过Windows签名文件（无签名模式�?
             }
           } else {
             Write-Warning 'No Windows MSI installer found'
           }
-          # 绿色版（portable）：仅可执行文件打 zip（不参与 Updater）
-          $exeCandidates = @(
+          # 绿色版（portable）：仅可执行文件�?zip（不参与 Updater�?          $exeCandidates = @(
             'src-tauri/target/release/cc-switch.exe',
             'src-tauri/target/x86_64-pc-windows-msvc/release/cc-switch.exe'
           )
@@ -379,21 +373,19 @@ jobs:
         run: |
           set -euxo pipefail
           mkdir -p release-assets
-          # Updater artifact: AppImage（含对应 .sig）
-          APPIMAGE=$(find src-tauri/target/release/bundle -name "*.AppImage" | head -1 || true)
+          # Updater artifact: AppImage（含对应 .sig�?          APPIMAGE=$(find src-tauri/target/release/bundle -name "*.AppImage" | head -1 || true)
           if [ -n "$APPIMAGE" ]; then
             cp "$APPIMAGE" release-assets/
             if [ "$SKIP_SIGNING" != "true" ]; then
               [ -f "$APPIMAGE.sig" ] && cp "$APPIMAGE.sig" release-assets/ || echo ".sig for AppImage not found"
             else
-              echo "跳过Linux签名文件（无签名模式）"
+              echo "跳过Linux签名文件（无签名模式�?
             fi
             echo "AppImage copied"
           else
             echo "No AppImage found under target/release/bundle" >&2
           fi
-          # 额外上传 .deb（用于手动安装，不参与 Updater）
-          DEB=$(find src-tauri/target/release/bundle -name "*.deb" | head -1 || true)
+          # 额外上传 .deb（用于手动安装，不参�?Updater�?          DEB=$(find src-tauri/target/release/bundle -name "*.deb" | head -1 || true)
           if [ -n "$DEB" ]; then
             cp "$DEB" release-assets/
             echo "Deb package copied"
@@ -411,7 +403,7 @@ jobs:
         run: |
           set -euo pipefail
           if [ "$SKIP_SIGNING" = "true" ]; then
-            echo "跳过签名收集（无签名模式）"
+            echo "跳过签名收集（无签名模式�?
           else
             echo "Collected signatures (if any alongside artifacts):"
             ls -la release-assets/*.sig || echo "No signatures found"
@@ -426,13 +418,11 @@ jobs:
           body: |
             ## CC Switch ${{ github.ref_name }}
 
-            Claude Code 供应商切换工具
-
+            Claude Code 供应商切换工�?
             ### 下载
 
             - macOS: `CC-Switch-macOS.zip`（解压即用）
-            - Windows: `CC-Switch-Setup.msi`（安装版）；`CC-Switch-Windows-Portable.zip`（绿色版）
-            - Linux: `*.deb`（Debian/Ubuntu 安装包）
+            - Windows: `CC-Switch-Setup.msi`（安装版）；`CC-Switch-Windows-Portable.zip`（绿色版�?            - Linux: `*.deb`（Debian/Ubuntu 安装包）
 
             ---
             提示：macOS 如遇“已损坏”提示，可在终端执行：`xattr -cr "/Applications/CC Switch.app"`
@@ -456,7 +446,7 @@ jobs:
     steps:
       - name: Prepare GH
         run: |
-          gh --version || (type -p curl >/dev/null && sudo apt-get update && sudo apt-get install -y gh || true)
+          gh --version || (type -p curl >/dev/null && sudo apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 update && sudo apt-get install -y gh || true)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Download all release assets
@@ -477,10 +467,9 @@ jobs:
           VERSION="${TAG#v}"
           PUB_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           base_url="https://github.com/$REPO/releases/download/$TAG"
-          # 检查是否有签名文件（如果没有，跳过latest.json生成）
-          if [ ! -f dl/*.sig ] 2>/dev/null; then
+          # 检查是否有签名文件（如果没有，跳过latest.json生成�?          if [ ! -f dl/*.sig ] 2>/dev/null; then
             echo "⚠️ 未找到签名文件，跳过latest.json生成（无签名构建不支持自动更新）"
-            echo "手动下载安装包进行更新"
+            echo "手动下载安装包进行更�?
             exit 0
           fi
 
@@ -504,7 +493,7 @@ jobs:
                 win_url="$url"; win_sig="$sig_content";;
             esac
           done
-          # 构造 JSON（仅包含存在的目标）
+          # 构�?JSON（仅包含存在的目标）
           tmp_json=$(mktemp)
           {
             echo '{'
@@ -514,8 +503,7 @@ jobs:
             echo '  "platforms": {'
             first=1
             if [ -n "$mac_url" ] && [ -n "$mac_sig" ]; then
-              # 为兼容 arm64 / x64，重复写入两个键，指向同一 universal 包
-              for key in darwin-aarch64 darwin-x86_64; do
+              # 为兼�?arm64 / x64，重复写入两个键，指向同一 universal �?              for key in darwin-aarch64 darwin-x86_64; do
                 [ $first -eq 0 ] && echo ','
                 echo "    \"$key\": {\"signature\": \"$mac_sig\", \"url\": \"$mac_url\"}"
                 first=0
