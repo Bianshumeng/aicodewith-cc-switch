@@ -1,0 +1,32 @@
+name: Simple Release Test
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  test-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Test pnpm
+        run: |
+          npm install -g pnpm
+          echo "pnpm version: $(pnpm --version)"
+
+      - name: Show files
+        run: |
+          ls -la
+          echo "Build would happen here"
