@@ -29,6 +29,9 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           profile: minimal
+          targets: ${{ matrix.platform == 'macos' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+        with:
+          profile: minimal
 
       - name: Prefetch crates (locked)
         env:
@@ -101,9 +104,37 @@ jobs:
           shared-key: cc-switch
           cache-on-failure: true
 
-      - name: Add macOS targets
+      - name: Add macOS targets (retry)
         if: matrix.platform == 'macos'
-        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+        id: macos_targets
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -e
+          for i in {1..5}; do
+            echo "Attempt $i/5: Adding macOS targets..."
+            if rustup target add aarch64-apple-darwin x86_64-apple-darwin; then
+              echo "✅ Successfully added macOS targets"
+              break
+            elif [ $i -eq 5 ]; then
+              echo "❌ Failed to add macOS targets after 5 attempts"
+              exit 1
+            else
+              echo "⚠️ Attempt $i failed, retrying in 20 seconds..."
+              sleep 20
+            fi
+          done
+
+      - name: Add macOS targets via mirror (fallback, opt-in)
+        if: matrix.platform == 'macos' && steps.macos_targets.outcome == 'failure' && vars.USE_RUSTUP_MIRROR == 'true'
+        shell: bash
+        env:
+          RUSTUP_DIST_SERVER: https://rsproxy.cn
+          RUSTUP_UPDATE_ROOT: https://rsproxy.cn/rustup
+        run: |
+          set -eux
+          echo "Fallback to mirror for rustup targets..."
+          rustup target add aarch64-apple-darwin x86_64-apple-darwin
 
 
       - name: Install Linux dependencies
