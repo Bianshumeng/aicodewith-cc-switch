@@ -116,13 +116,13 @@ jobs:
           for i in {1..5}; do
             echo "Attempt $i/5: Adding macOS targets..."
             if rustup target add aarch64-apple-darwin x86_64-apple-darwin; then
-              echo "�?Successfully added macOS targets"
+              echo "✅ Successfully added macOS targets"
               break
             elif [ $i -eq 5 ]; then
-              echo "�?Failed to add macOS targets after 3 attempts"
+              echo "❌ Failed to add macOS targets after 5 attempts"
               exit 1
             else
-              echo "鈿狅�?Attempt $i failed, retrying in 10 seconds..."
+              echo "⚠️ Attempt $i failed, retrying in 20 seconds..."
               sleep 20
             fi
           done
@@ -177,4 +177,137 @@ jobs:
             retry_cmd "sudo apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 install -y --no-install-recommends libwebkit2gtk-4.1-dev" || \
             retry_cmd "sudo apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 install -y --no-install-recommends libwebkit2gtk-4.0-dev"
           fi
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Get pnpm store directory
+        id: pnpm-store
+        shell: bash
+        run: echo "path=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-pnpm-store-
+
+      - name: Install frontend deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Prepare Tauri signing key
+        shell: bash
+        run: |
+          if [ -z "${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}" ]; then
+            echo "⚠️ TAURI_SIGNING_PRIVATE_KEY Secret 未设置，将跳过代码签名"
+            echo "SKIP_SIGNING=true" >> "$GITHUB_ENV"
+          else
+            echo "TAURI_SIGNING_PRIVATE_KEY=${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}" >> "$GITHUB_ENV"
+            if [ -n "${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}" ]; then
+              echo "TAURI_SIGNING_PRIVATE_KEY_PASSWORD=${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}" >> "$GITHUB_ENV"
+            fi
+            echo "✅ Tauri signing key prepared"
+          fi
+
+      - name: Build Tauri App
+        shell: bash
+        timeout-minutes: 30
+        run: |
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            pnpm tauri build --target universal-apple-darwin
+          else
+            pnpm tauri build
+          fi
+
+      - name: Prepare Release Assets
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p release-assets
+
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            # Windows MSI installer
+            find src-tauri/target/release/bundle/msi -name "*.msi" -exec cp {} release-assets/CC-Switch-Setup.msi \; || true
+            # Windows portable
+            if [ -f "src-tauri/target/release/cc-switch.exe" ]; then
+              mkdir -p temp-portable
+              cp src-tauri/target/release/cc-switch.exe temp-portable/
+              cd temp-portable && zip -r ../release-assets/CC-Switch-Windows-Portable.zip . && cd ..
+              rm -rf temp-portable
+            fi
+          elif [ "${{ runner.os }}" = "macOS" ]; then
+            # macOS .app bundle
+            find src-tauri/target/universal-apple-darwin/release/bundle/macos -name "*.app" | head -1 | xargs -I {} sh -c 'cd "$(dirname "{}")" && zip -r "$GITHUB_WORKSPACE/release-assets/CC-Switch-macOS.zip" "$(basename "{}")"' || true
+          elif [ "${{ runner.os }}" = "Linux" ]; then
+            # Linux .deb package
+            find src-tauri/target/release/bundle/deb -name "*.deb" -exec cp {} release-assets/CC-Switch-Linux.deb \; || true
+            # Linux AppImage
+            find src-tauri/target/release/bundle/appimage -name "*.AppImage" -exec cp {} release-assets/CC-Switch-Linux.AppImage \; || true
+          fi
+
+      - name: List prepared assets
+        shell: bash
+        run: ls -la release-assets/ || true
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cc-switch-${{ runner.os }}
+          path: release-assets/*
+
+  create-release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-assets
+          find artifacts -type f -exec cp {} release-assets/ \;
+          ls -la release-assets/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: CC-Switch for AiCodeWith ${{ github.ref_name }}
+          prerelease: true
+          body: |
+            ## CC-Switch for AiCodeWith ${{ github.ref_name }}
+
+            专为 [AiCodeWith中转站](https://aicodewith.com/) 定制的Claude Code & Codex 供应商切换工具
+
+            ### 🚀 特色功能
+
+            - 🚀 预置AiCodeWith供应商配置，开箱即用
+            - 🌐 专为国内用户优化的Claude API中转服务
+            - ⚡ 支持在官方登录和AiCodeWith服务间一键切换
+            - 🔒 基于成熟的CC-Switch架构，保障配置安全
+
+            ### 📥 下载安装
+
+            - **Windows**: `CC-Switch-Setup.msi`（安装版）；`CC-Switch-Windows-Portable.zip`（绿色版）
+            - **macOS**: `CC-Switch-macOS.zip`（解压即用）
+            - **Linux**: `CC-Switch-Linux.deb`（DEB包）；`CC-Switch-Linux.AppImage`（通用格式）
+
+            ### 🎯 使用说明
+
+            1. 下载对应系统的安装包
+            2. 访问 [AiCodeWith](https://aicodewith.com/) 获取API Token
+            3. 在应用中选择预置的"AiCodeWith"供应商并填入Token
+            4. 一键切换即可使用
+
+            ---
+            **基于开源项目**：Fork自 [farion1231/cc-switch](https://github.com/farion1231/cc-switch)，遵循MIT许可证
+          files: release-assets/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
