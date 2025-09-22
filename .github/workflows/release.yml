@@ -42,7 +42,10 @@ jobs:
         run: |
           set -euxo pipefail
           mkdir -p "$CARGO_HOME"
-          cargo fetch --locked
+          cargo fetch --locked\r
+          cargo fetch --locked --target aarch64-apple-darwin\r
+          cargo fetch --locked --target x86_64-apple-darwin\r
+          cargo fetch --locked --target x86_64-pc-windows-msvc\r
           tar -C "$CARGO_HOME" -czf cargo-home.tgz .
           mv cargo-home.tgz "$GITHUB_WORKSPACE/"
 
@@ -140,25 +143,19 @@ jobs:
         timeout-minutes: 10
         run: |
           set -euxo pipefail
-          # Retry apt operations with backoff
+          # Retry apt ops with timeouts
           retry_cmd() {
             local cmd="$*"
-            for i in {1..5}; do
-              echo "Attempt $i/3: $cmd"
-              if eval "$cmd"; then
-                return 0
-              elif [ $i -eq 5 ]; then
-                echo "�?Command failed after 3 attempts: $cmd"
-                return 1
-              else
-                echo "鈿狅�?Attempt $i failed, retrying in 5 seconds..."
-                sleep 5
-              fi
+            for k in {1..5}; do
+              echo "Attempt $k/5: $cmd"
+              if eval "$cmd"; then return 0; fi
+              if [ $k -eq 5 ]; then echo "? Command failed"; return 1; fi
+              echo "?? Retry in 10s..."; sleep 10
             done
           }
 
           retry_cmd "sudo apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 update"
-          # Core build tools and pkg-config
+          # Base toolchain and libs
           retry_cmd "sudo apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 install -y --no-install-recommends \
             build-essential \
             pkg-config \
@@ -167,382 +164,17 @@ jobs:
             file \
             patchelf \
             squashfs-tools \
-            libssl-dev"
-          # GTK/GLib stack for gdk-3.0, glib-2.0, gio-2.0
-          retry_cmd "sudo apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 install -y --no-install-recommends \
+            libssl-dev \
             libgtk-3-dev \
+            libayatana-appindicator3-dev \
             librsvg2-dev \
-            libayatana-appindicator3-dev"
-          # WebKit2GTK (version differs across Ubuntu images; try 4.1 then 4.0)
-          retry_cmd "sudo apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 install -y --no-install-recommends libwebkit2gtk-4.1-dev" \
-            || retry_cmd "sudo apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 install -y --no-install-recommends libwebkit2gtk-4.0-dev"
-          # libsoup also changed major version; prefer 3.0 with fallback to 2.4
-          retry_cmd "sudo apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 install -y --no-install-recommends libsoup-3.0-dev" \
-            || retry_cmd "sudo apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 install -y --no-install-recommends libsoup2.4-dev"
+            libfuse2"
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 10.12.3
-          run_install: false
-
-      - name: Get pnpm store directory
-        id: pnpm-store
-        shell: bash
-        run: echo "path=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
-
-      - name: Setup pnpm cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.pnpm-store.outputs.path }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: ${{ runner.os }}-pnpm-store-
-
-      - name: Install frontend deps
-        run: pnpm install --frozen-lockfile
-
-      - name: Prepare Tauri signing key
-        shell: bash
-        run: |
-          # 妫€�?Secret 鏄惁瀛樺湪锛屽鏋滄病鏈夊垯璺宠繃绛惧悕
-          if [ -z "${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}" ]; then
-            echo "鈿狅�?TAURI_SIGNING_PRIVATE_KEY Secret 鏈缃紝灏嗚烦杩囦唬鐮佺鍚? >&2
-            echo "杩欎笉褰卞搷搴旂敤绋嬪簭鐨勬瀯寤哄拰鍔熻兘锛屽彧鏄畨瑁呭寘涓嶄細鍖呭惈浠ｇ爜绛惧悕" >&2
-            echo "SKIP_SIGNING=true" >> "$GITHUB_ENV"
-            exit 0
-          fi
-          
-          RAW="${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}"
-          # 鐩爣锛氭彁渚涙纭殑绉侀挜鈥滄枃浠惰矾寰勨€濈粰 Tauri CLI锛岄伩鍏嶅唴瀹硅В鐮佹涔?          KEY_PATH="$RUNNER_TEMP/tauri_signing.key"
-          # 鎯呭�?1锛氬師濮嬩袱琛屾枃鏈紙绗竴琛屼互 "untrusted comment:" 寮€澶达�?
-          if echo "$RAW" | head -n1 | grep -q '^untrusted comment:'; then
-            printf '%s\n' "$RAW" > "$KEY_PATH"
-            echo "�?浣跨敤鍘熷涓よ瀵嗛挜鏂囦欢鏍煎�?
+          # WebKit2GTK selection (Jammy prefers 4.0)
+          if grep -q 'VERSION_ID="22.04"' /etc/os-release; then
+            retry_cmd "sudo apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 install -y --no-install-recommends libwebkit2gtk-4.0-dev"
           else
-            # 鎯呭�?2锛氭暣浣撹 base64 鍖呰９锛堣В鍖呭悗搴斿綋鏄袱琛岋�?
-            if DECODED=$(printf '%s' "$RAW" | (base64 --decode 2>/dev/null || base64 -D 2>/dev/null)) \
-               && echo "$DECODED" | head -n1 | grep -q '^untrusted comment:'; then
-              printf '%s\n' "$DECODED" > "$KEY_PATH"
-              echo "�?鎴愬姛瑙ｇ爜 base64 鍖呰９瀵嗛挜锛屽凡杩樺師涓轰袱琛屾枃浠?
-            else
-              # 鎯呭�?3锛氬凡鏄浜岃锛堢函 Base64 涓€琛岋級鈫?鏋勯€犱袱琛屾枃�?              if echo "$RAW" | grep -Eq '^[A-Za-z0-9+/=]+$'; then
-                ONE=$(printf '%s' "$RAW" | tr -d '\r\n')
-                printf '%s\n%s\n' "untrusted comment: tauri signing key" "$ONE" > "$KEY_PATH"
-                echo "�?浣跨敤涓€琛?Base64 绉侀挜锛屽凡鏋勯€犱袱琛屾枃�?
-              else
-                echo "�?TAURI_SIGNING_PRIVATE_KEY 鏍煎紡鏃犳硶璇嗗埆锛氭棦涓嶆槸涓よ鍘熸枃锛屼篃涓嶆槸鍏?base64锛屼害闈炰竴�?base64" >&2
-                echo "瀵嗛挜鍓?0涓瓧绗? $(echo "$RAW" | head -c 10)..." >&2
-                exit 1
-              fi
-            fi
-          fi
-          # 灏嗏€滃畬鏁翠袱琛屽唴瀹光€濅綔涓虹幆澧冨彉閲忔敞鍏ワ紙Tauri 鏀寔浼犲叆瀹屾暣绉侀挜鏂囨湰鎴栨枃浠惰矾寰勶�?
-          # 浣跨敤澶氳鍐欏叆璇硶锛屼繚鎸佹崲琛屼互渚胯В鏋?          # 灏嗗畬鏁翠袱琛岀閽ュ唴瀹硅繘琛?base64 缂栫爜锛屼綔涓哄崟琛屽唴瀹规敞鍏ョ幆澧冨彉閲?          if command -v base64 >/dev/null 2>&1; then
-            KEY_B64=$(base64 < "$KEY_PATH" | tr -d '\r\n')
-          elif command -v openssl >/dev/null 2>&1; then
-            KEY_B64=$(openssl base64 -A -in "$KEY_PATH")
-          else
-            KEY_B64=$(KEY_PATH="$KEY_PATH" node -e "process.stdout.write(require('fs').readFileSync(process.env.KEY_PATH).toString('base64'))")
-          fi
-          if [ -z "$KEY_B64" ]; then
-            echo "�?鏃犳硶鐢熸垚绉侀�?base64 鍐呭�? >&2
-            exit 1
-          fi
-          echo "TAURI_SIGNING_PRIVATE_KEY=$KEY_B64" >> "$GITHUB_ENV"
-          if [ -n "${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}" ]; then
-            echo "TAURI_SIGNING_PRIVATE_KEY_PASSWORD=${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}" >> $GITHUB_ENV
-          fi
-          echo "�?Tauri signing key prepared"
-
-      - name: Build Tauri App (macOS)
-        if: runner.os == 'macOS'
-        shell: bash
-        timeout-minutes: 30
-        run: |
-          export CARGO_NET_RETRY=10
-          export CARGO_NET_TIMEOUT=30
-          if [ "$SKIP_SIGNING" = "true" ]; then
-            echo "鏋勫缓macOS搴旂敤锛堟棤绛惧悕锛?.."
-            pnpm tauri build --target universal-apple-darwin
-          else
-            echo "鏋勫缓macOS搴旂敤锛堝惈绛惧悕锛?.."
-            pnpm tauri build --target universal-apple-darwin
+            retry_cmd "sudo apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 install -y --no-install-recommends libwebkit2gtk-4.1-dev" || \
+            retry_cmd "sudo apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 install -y --no-install-recommends libwebkit2gtk-4.0-dev"
           fi
 
-      - name: Build Tauri App (Windows)
-        if: runner.os == 'Windows'
-        shell: bash
-        timeout-minutes: 30
-        run: |
-          export CARGO_NET_RETRY=10
-          export CARGO_NET_TIMEOUT=30
-          if [ "$SKIP_SIGNING" = "true" ]; then
-            echo "鏋勫缓Windows搴旂敤锛堟棤绛惧悕锛?.."
-            pnpm tauri build
-          else
-            echo "鏋勫缓Windows搴旂敤锛堝惈绛惧悕锛?.."
-            pnpm tauri build
-          fi
-
-      - name: Build Tauri App (Linux)
-        if: runner.os == 'Linux'
-        shell: bash
-        timeout-minutes: 30
-        run: |
-          export CARGO_NET_RETRY=10
-          export CARGO_NET_TIMEOUT=30
-          if [ "$SKIP_SIGNING" = "true" ]; then
-            echo "鏋勫缓Linux搴旂敤锛堟棤绛惧悕锛?.."
-            pnpm tauri build
-          else
-            echo "鏋勫缓Linux搴旂敤锛堝惈绛惧悕锛?.."
-            pnpm tauri build
-          fi
-
-      - name: Prepare macOS Assets
-        if: runner.os == 'macOS'
-        shell: bash
-        run: |
-          set -euxo pipefail
-          mkdir -p release-assets
-          echo "Looking for updater artifact (.tar.gz) and .app for zip..."
-          TAR_GZ=""; APP_PATH=""
-          for path in \
-            "src-tauri/target/universal-apple-darwin/release/bundle/macos" \
-            "src-tauri/target/aarch64-apple-darwin/release/bundle/macos" \
-            "src-tauri/target/x86_64-apple-darwin/release/bundle/macos" \
-            "src-tauri/target/release/bundle/macos"; do
-            if [ -d "$path" ]; then
-              [ -z "$TAR_GZ" ] && TAR_GZ=$(find "$path" -maxdepth 1 -name "*.tar.gz" -type f | head -1 || true)
-              [ -z "$APP_PATH" ] && APP_PATH=$(find "$path" -maxdepth 1 -name "*.app" -type d | head -1 || true)
-            fi
-          done
-          if [ -z "$TAR_GZ" ]; then
-            echo "No macOS .tar.gz updater artifact found" >&2
-            exit 1
-          fi
-          cp "$TAR_GZ" release-assets/
-          if [ "$SKIP_SIGNING" != "true" ]; then
-            [ -f "$TAR_GZ.sig" ] && cp "$TAR_GZ.sig" release-assets/ || echo ".sig for macOS not found yet"
-          else
-            echo "璺宠繃macOS绛惧悕鏂囦欢锛堟棤绛惧悕妯″紡�?
-          fi
-          echo "macOS updater artifact copied: $(basename "$TAR_GZ")"
-          if [ -n "$APP_PATH" ]; then
-            APP_DIR=$(dirname "$APP_PATH"); APP_NAME=$(basename "$APP_PATH")
-            cd "$APP_DIR"
-            ditto -c -k --sequesterRsrc --keepParent "$APP_NAME" "CC-Switch-macOS.zip"
-            mv "CC-Switch-macOS.zip" "$GITHUB_WORKSPACE/release-assets/"
-            echo "macOS zip ready: CC-Switch-macOS.zip"
-          else
-            echo "No .app found to zip (optional)" >&2
-          fi
-
-      - name: Prepare Windows Assets
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          New-Item -ItemType Directory -Force -Path release-assets | Out-Null
-          # 浠呮墦鍖?MSI 瀹夎鍣?+ .sig锛堢敤浜?Updater�?          $msi = Get-ChildItem -Path 'src-tauri/target/release/bundle/msi' -Recurse -Include *.msi -ErrorAction SilentlyContinue | Select-Object -First 1
-          if ($null -eq $msi) {
-            # 鍏滃簳锛氬叏灞€鎼滅�?.msi
-            $msi = Get-ChildItem -Path 'src-tauri/target/release/bundle' -Recurse -Include *.msi -ErrorAction SilentlyContinue | Select-Object -First 1
-          }
-          if ($null -ne $msi) {
-            $dest = 'CC-Switch-Setup.msi'
-            Copy-Item $msi.FullName (Join-Path release-assets $dest)
-            Write-Host "Installer copied: $dest"
-            if ($env:SKIP_SIGNING -ne "true") {
-              $sigPath = "$($msi.FullName).sig"
-              if (Test-Path $sigPath) {
-                Copy-Item $sigPath (Join-Path release-assets ("$dest.sig"))
-                Write-Host "Signature copied: $dest.sig"
-              } else {
-                Write-Warning "Signature not found for $($msi.Name)"
-              }
-            } else {
-              Write-Host "璺宠繃Windows绛惧悕鏂囦欢锛堟棤绛惧悕妯″紡�?
-            }
-          } else {
-            Write-Warning 'No Windows MSI installer found'
-          }
-          # 缁胯壊鐗堬紙portable锛夛細浠呭彲鎵ц鏂囦欢鎵?zip锛堜笉鍙備笌 Updater�?          $exeCandidates = @(
-            'src-tauri/target/release/cc-switch.exe',
-            'src-tauri/target/x86_64-pc-windows-msvc/release/cc-switch.exe'
-          )
-          $exePath = $exeCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
-          if ($null -ne $exePath) {
-            $portableDir = 'release-assets/CC-Switch-Portable'
-            New-Item -ItemType Directory -Force -Path $portableDir | Out-Null
-            Copy-Item $exePath $portableDir
-            Compress-Archive -Path "$portableDir/*" -DestinationPath 'release-assets/CC-Switch-Windows-Portable.zip' -Force
-            Remove-Item -Recurse -Force $portableDir
-            Write-Host 'Windows portable zip created'
-          } else {
-            Write-Warning 'Portable exe not found'
-          }
-
-      - name: Prepare Linux Assets
-        if: runner.os == 'Linux'
-        shell: bash
-        run: |
-          set -euxo pipefail
-          mkdir -p release-assets
-          # Updater artifact: AppImage锛堝惈瀵瑰�?.sig�?          APPIMAGE=$(find src-tauri/target/release/bundle -name "*.AppImage" | head -1 || true)
-          if [ -n "$APPIMAGE" ]; then
-            cp "$APPIMAGE" release-assets/
-            if [ "$SKIP_SIGNING" != "true" ]; then
-              [ -f "$APPIMAGE.sig" ] && cp "$APPIMAGE.sig" release-assets/ || echo ".sig for AppImage not found"
-            else
-              echo "璺宠繃Linux绛惧悕鏂囦欢锛堟棤绛惧悕妯″紡�?
-            fi
-            echo "AppImage copied"
-          else
-            echo "No AppImage found under target/release/bundle" >&2
-          fi
-          # 棰濆涓婁紶 .deb锛堢敤浜庢墜鍔ㄥ畨瑁咃紝涓嶅弬涓?Updater�?          DEB=$(find src-tauri/target/release/bundle -name "*.deb" | head -1 || true)
-          if [ -n "$DEB" ]; then
-            cp "$DEB" release-assets/
-            echo "Deb package copied"
-          else
-            echo "No .deb found (optional)"
-          fi
-
-      - name: List prepared assets
-        shell: bash
-        run: |
-          ls -la release-assets || true
-
-      - name: Collect Signatures
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ "$SKIP_SIGNING" = "true" ]; then
-            echo "璺宠繃绛惧悕鏀堕泦锛堟棤绛惧悕妯″紡�?
-          else
-            echo "Collected signatures (if any alongside artifacts):"
-            ls -la release-assets/*.sig || echo "No signatures found"
-          fi
-
-      - name: Upload Release Assets
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          name: CC Switch ${{ github.ref_name }}
-          prerelease: true
-          body: |
-            ## CC Switch ${{ github.ref_name }}
-
-            Claude Code 渚涘簲鍟嗗垏鎹㈠伐鍏?
-            ### 涓嬭�?
-
-            - macOS: `CC-Switch-macOS.zip`锛堣В鍘嬪嵆鐢級
-            - Windows: `CC-Switch-Setup.msi`锛堝畨瑁呯増锛夛紱`CC-Switch-Windows-Portable.zip`锛堢豢鑹茬増�?            - Linux: `*.deb`锛圖ebian/Ubuntu 瀹夎鍖咃級
-
-            ---
-            鎻愮ず锛歮acOS 濡傞亣鈥滃凡鎹熷潖鈥濇彁绀猴紝鍙湪缁堢鎵ц锛歚xattr -cr "/Applications/CC Switch.app"`
-          files: release-assets/*
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: List generated bundles (debug)
-        if: always()
-        shell: bash
-        run: |
-          echo "Listing bundles in src-tauri/target..."
-          find src-tauri/target -maxdepth 4 -type f -name "*.*" 2>/dev/null || true
-
-  assemble-latest-json:
-    name: Assemble latest.json
-    runs-on: ubuntu-22.04
-    needs: release
-    permissions:
-      contents: write
-    steps:
-      - name: Prepare GH
-        run: |
-          gh --version || (type -p curl >/dev/null && sudo apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 update && sudo apt-get install -y gh || true)
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Download all release assets
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euxo pipefail
-          TAG="${GITHUB_REF_NAME}"
-          mkdir -p dl
-          gh release download "$TAG" --dir dl --repo "$GITHUB_REPOSITORY"
-          ls -la dl || true
-      - name: Generate latest.json
-        env:
-          REPO: ${{ github.repository }}
-          TAG: ${{ github.ref_name }}
-        run: |
-          set -euo pipefail
-          VERSION="${TAG#v}"
-          PUB_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          base_url="https://github.com/$REPO/releases/download/$TAG"
-          # 妫€鏌ユ槸鍚︽湁绛惧悕鏂囦欢锛堝鏋滄病鏈夛紝璺宠繃latest.json鐢熸垚锛?          if [ ! -f dl/*.sig ] 2>/dev/null; then
-            echo "鈿狅�?鏈壘鍒扮鍚嶆枃浠讹紝璺宠繃latest.json鐢熸垚锛堟棤绛惧悕鏋勫缓涓嶆敮鎸佽嚜鍔ㄦ洿鏂帮級"
-            echo "鎵嬪姩涓嬭浇瀹夎鍖呰繘琛屾洿鏂?
-            exit 0
-          fi
-
-          # 鍒濆鍖栫┖骞冲彴鏄犲皠
-          mac_url=""; mac_sig=""
-          win_url=""; win_sig=""
-          linux_url=""; linux_sig=""
-          shopt -s nullglob
-          for sig in dl/*.sig; do
-            base=${sig%.sig}
-            fname=$(basename "$base")
-            url="$base_url/$fname"
-            sig_content=$(cat "$sig")
-            case "$fname" in
-              *.tar.gz)
-                # 瑙嗕�?macOS updater artifact
-                mac_url="$url"; mac_sig="$sig_content";;
-              *.AppImage|*.appimage)
-                linux_url="$url"; linux_sig="$sig_content";;
-              *.msi|*.exe)
-                win_url="$url"; win_sig="$sig_content";;
-            esac
-          done
-          # 鏋勯�?JSON锛堜粎鍖呭惈瀛樺湪鐨勭洰鏍囷�?
-          tmp_json=$(mktemp)
-          {
-            echo '{'
-            echo "  \"version\": \"$VERSION\",";
-            echo "  \"notes\": \"Release $TAG\",";
-            echo "  \"pub_date\": \"$PUB_DATE\",";
-            echo '  "platforms": {'
-            first=1
-            if [ -n "$mac_url" ] && [ -n "$mac_sig" ]; then
-              # 涓哄吋�?arm64 / x64锛岄噸澶嶅啓鍏ヤ袱涓敭锛屾寚鍚戝悓涓€ universal �?              for key in darwin-aarch64 darwin-x86_64; do
-                [ $first -eq 0 ] && echo ','
-                echo "    \"$key\": {\"signature\": \"$mac_sig\", \"url\": \"$mac_url\"}"
-                first=0
-              done
-            fi
-            if [ -n "$win_url" ] && [ -n "$win_sig" ]; then
-              [ $first -eq 0 ] && echo ','
-              echo "    \"windows-x86_64\": {\"signature\": \"$win_sig\", \"url\": \"$win_url\"}"
-              first=0
-            fi
-            if [ -n "$linux_url" ] && [ -n "$linux_sig" ]; then
-              [ $first -eq 0 ] && echo ','
-              echo "    \"linux-x86_64\": {\"signature\": \"$linux_sig\", \"url\": \"$linux_url\"}"
-              first=0
-            fi
-            echo '  }'
-            echo '}'
-          } > "$tmp_json"
-          echo "Generated latest.json:" && cat "$tmp_json"
-          mv "$tmp_json" latest.json
-      - name: Upload latest.json to release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euxo pipefail
-          gh release upload "$GITHUB_REF_NAME" latest.json --clobber --repo "$GITHUB_REPOSITORY"
