@@ -179,13 +179,13 @@ jobs:
             exit 1
           fi
           # 重命名 tar.gz 为统一格式
-          NEW_TAR_GZ="CC-Switch-${VERSION}-macOS.tar.gz"
+          NEW_TAR_GZ="AI-Code-With-${VERSION}-macOS.tar.gz"
           cp "$TAR_GZ" "release-assets/$NEW_TAR_GZ"
           [ -f "$TAR_GZ.sig" ] && cp "$TAR_GZ.sig" "release-assets/$NEW_TAR_GZ.sig" || echo ".sig for macOS not found yet"
           echo "macOS updater artifact copied: $NEW_TAR_GZ"
           if [ -n "$APP_PATH" ]; then
             APP_DIR=$(dirname "$APP_PATH"); APP_NAME=$(basename "$APP_PATH")
-            NEW_ZIP="CC-Switch-${VERSION}-macOS.zip"
+            NEW_ZIP="AI-Code-With-${VERSION}-macOS.zip"
             cd "$APP_DIR"
             ditto -c -k --sequesterRsrc --keepParent "$APP_NAME" "$NEW_ZIP"
             mv "$NEW_ZIP" "$GITHUB_WORKSPACE/release-assets/"
@@ -208,7 +208,7 @@ jobs:
             $msi = Get-ChildItem -Path 'src-tauri/target/release/bundle' -Recurse -Include *.msi -ErrorAction SilentlyContinue | Select-Object -First 1
           }
           if ($null -ne $msi) {
-            $dest = "CC-Switch-$VERSION-Windows.msi"
+          $dest = "AI-Code-With-$VERSION-Windows.msi"
             Copy-Item $msi.FullName (Join-Path release-assets $dest)
             Write-Host "Installer copied: $dest"
             $sigPath = "$($msi.FullName).sig"
@@ -228,19 +228,19 @@ jobs:
           )
           $exePath = $exeCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
           if ($null -ne $exePath) {
-            $portableDir = 'release-assets/CC-Switch-Portable'
+          $portableDir = 'release-assets/AI-Code-With-Portable'
             New-Item -ItemType Directory -Force -Path $portableDir | Out-Null
             Copy-Item $exePath $portableDir
             $portableIniPath = Join-Path $portableDir 'portable.ini'
             $portableContent = @(
-              '# CC Switch portable build marker',
+              '# AI Code With portable build marker',
               'portable=true'
             )
             $portableContent | Set-Content -Path $portableIniPath -Encoding UTF8
-            $portableZip = "release-assets/CC-Switch-$VERSION-Windows-Portable.zip"
+            $portableZip = "release-assets/AI-Code-With-$VERSION-Windows-Portable.zip"
             Compress-Archive -Path "$portableDir/*" -DestinationPath $portableZip -Force
             Remove-Item -Recurse -Force $portableDir
-            Write-Host "Windows portable zip created: CC-Switch-$VERSION-Windows-Portable.zip"
+            Write-Host "Windows portable zip created: AI-Code-With-$VERSION-Windows-Portable.zip"
           } else {
             Write-Warning 'Portable exe not found'
           }
@@ -255,7 +255,7 @@ jobs:
           # Updater artifact: AppImage（含对应 .sig）
           APPIMAGE=$(find src-tauri/target/release/bundle -name "*.AppImage" | head -1 || true)
           if [ -n "$APPIMAGE" ]; then
-            NEW_APPIMAGE="CC-Switch-${VERSION}-Linux.AppImage"
+            NEW_APPIMAGE="AI-Code-With-${VERSION}-Linux.AppImage"
             cp "$APPIMAGE" "release-assets/$NEW_APPIMAGE"
             [ -f "$APPIMAGE.sig" ] && cp "$APPIMAGE.sig" "release-assets/$NEW_APPIMAGE.sig" || echo ".sig for AppImage not found"
             echo "AppImage copied: $NEW_APPIMAGE"
@@ -265,7 +265,7 @@ jobs:
           # 额外上传 .deb（用于手动安装，不参与 Updater）
           DEB=$(find src-tauri/target/release/bundle -name "*.deb" | head -1 || true)
           if [ -n "$DEB" ]; then
-            NEW_DEB="CC-Switch-${VERSION}-Linux.deb"
+            NEW_DEB="AI-Code-With-${VERSION}-Linux.deb"
             cp "$DEB" "release-assets/$NEW_DEB"
             echo "Deb package copied: $NEW_DEB"
           else
@@ -288,21 +288,21 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          name: CC Switch ${{ github.ref_name }}
+          name: AI Code With ${{ github.ref_name }}
           prerelease: true
           body: |
-            ## CC Switch ${{ github.ref_name }}
+            ## AI Code With ${{ github.ref_name }}
 
             Claude Code 供应商切换工具
 
             ### 下载
 
-            - **macOS**: `CC-Switch-${{ github.ref_name }}-macOS.zip`（解压即用）或 `CC-Switch-${{ github.ref_name }}-macOS.tar.gz`（Homebrew）
-            - **Windows**: `CC-Switch-${{ github.ref_name }}-Windows.msi`（安装版）或 `CC-Switch-${{ github.ref_name }}-Windows-Portable.zip`（绿色版）
-            - **Linux**: `CC-Switch-${{ github.ref_name }}-Linux.AppImage`（AppImage）或 `CC-Switch-${{ github.ref_name }}-Linux.deb`（Debian/Ubuntu）
+            - **macOS**: `AI-Code-With-${{ github.ref_name }}-macOS.zip`（解压即用）或 `AI-Code-With-${{ github.ref_name }}-macOS.tar.gz`（Homebrew）
+            - **Windows**: `AI-Code-With-${{ github.ref_name }}-Windows.msi`（安装版）或 `AI-Code-With-${{ github.ref_name }}-Windows-Portable.zip`（绿色版）
+            - **Linux**: `AI-Code-With-${{ github.ref_name }}-Linux.AppImage`（AppImage）或 `AI-Code-With-${{ github.ref_name }}-Linux.deb`（Debian/Ubuntu）
 
             ---
-            提示：macOS 如遇"已损坏"提示，可在终端执行：`xattr -cr "/Applications/CC Switch.app"`
+            提示：macOS 如遇"已损坏"提示，可在终端执行：`xattr -cr "/Applications/AI Code With.app"`
           files: release-assets/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
