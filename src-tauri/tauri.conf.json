@@ -59,7 +59,7 @@
       }
     },
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEM4MDI4QzlBNTczOTI4RTMKUldUaktEbFhtb3dDeUM5US9kT0FmdGR5Ti9vQzcwa2dTMlpibDVDUmQ2M0VGTzVOWnd0SGpFVlEK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQyREYwRjM5Q0FCOEU0RTkKUldUcDVMaktPUS9mMHVsK0djWVBSN1E3MWZnYzhrclFWSXhadytacndON0VtSjZZdjBsWVhtejYK",
       "endpoints": [
         "https://github.com/Bianshumeng/aicodewith-cc-switch/releases/latest/download/latest.json"
       ]
