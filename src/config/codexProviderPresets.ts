@@ -65,6 +65,7 @@ export const codexProviderPresets: CodexProviderPreset[] = [
   {
     name: "AI Code With",
     websiteUrl: "https://aicodewith.com",
+    apiKeyUrl: "https://aicodewith.com/dashboard/api-keys",
     category: "aggregator",
     auth: generateThirdPartyAuth(""),
     config: `model_provider = "aicodewith"

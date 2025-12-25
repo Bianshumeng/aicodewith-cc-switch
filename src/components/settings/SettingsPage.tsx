@@ -7,10 +7,7 @@ import {
   Activity,
   Coins,
   Database,
-  Server,
-  ChevronDown,
 } from "lucide-react";
-import * as AccordionPrimitive from "@radix-ui/react-accordion";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -34,7 +31,6 @@ import { WindowSettings } from "@/components/settings/WindowSettings";
 import { DirectorySettings } from "@/components/settings/DirectorySettings";
 import { ImportExportSection } from "@/components/settings/ImportExportSection";
 import { AboutSection } from "@/components/settings/AboutSection";
-import { ProxyPanel } from "@/components/proxy";
 import { PricingConfigPanel } from "@/components/usage/PricingConfigPanel";
 import { ModelTestConfigPanel } from "@/components/usage/ModelTestConfigPanel";
 import { AutoFailoverConfigPanel } from "@/components/proxy/AutoFailoverConfigPanel";
@@ -44,8 +40,6 @@ import { useSettings } from "@/hooks/useSettings";
 import { useImportExport } from "@/hooks/useImportExport";
 import { useTranslation } from "react-i18next";
 import type { SettingsFormState } from "@/hooks/useSettings";
-import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
 import { useProxyStatus } from "@/hooks/useProxyStatus";
 
 interface SettingsDialogProps {
@@ -64,7 +58,6 @@ export function SettingsPage({
     settings,
     isLoading,
     isSaving,
-    isPortable,
     appConfigDir,
     resolvedDirs,
     updateSettings,
@@ -176,24 +169,7 @@ export function SettingsPage({
 
   const isBusy = useMemo(() => isLoading && !settings, [isLoading, settings]);
 
-  const {
-    isRunning,
-    startProxyServer,
-    stopWithRestore,
-    isPending: isProxyPending,
-  } = useProxyStatus();
-
-  const handleToggleProxy = async (checked: boolean) => {
-    try {
-      if (!checked) {
-        await stopWithRestore();
-      } else {
-        await startProxyServer();
-      }
-    } catch (error) {
-      console.error("Toggle proxy failed:", error);
-    }
-  };
+  const { isRunning } = useProxyStatus();
 
   return (
     <div className="mx-auto max-w-[56rem] flex flex-col h-[calc(100vh-8rem)] overflow-hidden px-6">
@@ -284,50 +260,6 @@ export function SettingsPage({
                           onBrowseDirectory={browseDirectory}
                           onResetDirectory={resetDirectory}
                         />
-                      </AccordionContent>
-                    </AccordionItem>
-
-                    <AccordionItem
-                      value="proxy"
-                      className="rounded-xl glass-card overflow-hidden [&[data-state=open]>.accordion-header]:bg-muted/50"
-                    >
-                      <AccordionPrimitive.Header className="accordion-header flex items-center justify-between px-6 py-4 hover:bg-muted/50">
-                        <AccordionPrimitive.Trigger className="flex flex-1 items-center justify-between hover:no-underline [&[data-state=open]>svg]:rotate-180">
-                          <div className="flex items-center gap-3">
-                            <Server className="h-5 w-5 text-green-500" />
-                            <div className="text-left">
-                              <h3 className="text-base font-semibold">
-                                {t("settings.advanced.proxy.title")}
-                              </h3>
-                              <p className="text-sm text-muted-foreground font-normal">
-                                {t("settings.advanced.proxy.description")}
-                              </p>
-                            </div>
-                          </div>
-                          <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />
-                        </AccordionPrimitive.Trigger>
-
-                        <div className="flex items-center gap-4 pl-4">
-                          <Badge
-                            variant={isRunning ? "default" : "secondary"}
-                            className="gap-1.5 h-6"
-                          >
-                            <Activity
-                              className={`h-3 w-3 ${isRunning ? "animate-pulse" : ""}`}
-                            />
-                            {isRunning
-                              ? t("settings.advanced.proxy.running")
-                              : t("settings.advanced.proxy.stopped")}
-                          </Badge>
-                          <Switch
-                            checked={isRunning}
-                            onCheckedChange={handleToggleProxy}
-                            disabled={isProxyPending}
-                          />
-                        </div>
-                      </AccordionPrimitive.Header>
-                      <AccordionContent className="px-6 pb-6 pt-0 border-t border-border/50">
-                        <ProxyPanel />
                       </AccordionContent>
                     </AccordionItem>
 
@@ -508,7 +440,7 @@ export function SettingsPage({
             </TabsContent>
 
             <TabsContent value="about" className="mt-0">
-              <AboutSection isPortable={isPortable} />
+              <AboutSection />
             </TabsContent>
 
             <TabsContent value="usage" className="mt-0">

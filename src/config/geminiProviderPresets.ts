@@ -34,6 +34,7 @@ export const geminiProviderPresets: GeminiProviderPreset[] = [
   {
     name: "AI Code With",
     websiteUrl: "https://aicodewith.com",
+    apiKeyUrl: "https://aicodewith.com/dashboard/api-keys",
     settingsConfig: {
       env: {
         GOOGLE_GEMINI_BASE_URL: "https://api.aicodewith.com/gemini_cli",

@@ -36,7 +36,6 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { SettingsPage } from "@/components/settings/SettingsPage";
 import { UpdateBadge } from "@/components/UpdateBadge";
 import { EnvWarningBanner } from "@/components/env/EnvWarningBanner";
-import { ProxyToggle } from "@/components/proxy/ProxyToggle";
 import UsageScriptModal from "@/components/UsageScriptModal";
 import UnifiedMcpPanel from "@/components/mcp/UnifiedMcpPanel";
 import PromptPanel from "@/components/prompts/PromptPanel";
@@ -584,8 +583,6 @@ function App() {
             )}
             {currentView === "providers" && (
               <>
-                <ProxyToggle activeApp={activeApp} />
-
                 <AppSwitcher activeApp={activeApp} onSwitch={setActiveApp} />
 
                 <div className="flex items-center gap-1 p-1 bg-muted rounded-xl">

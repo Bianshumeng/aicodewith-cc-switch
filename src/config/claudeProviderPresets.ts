@@ -49,6 +49,7 @@ export const providerPresets: ProviderPreset[] = [
   {
     name: "AI Code With",
     websiteUrl: "https://aicodewith.com",
+    apiKeyUrl: "https://aicodewith.com/dashboard/api-keys",
     settingsConfig: {
       env: {
         ANTHROPIC_BASE_URL: "https://api.aicodewith.com",

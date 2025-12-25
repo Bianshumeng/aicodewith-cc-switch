@@ -20,7 +20,10 @@ import type { AppId } from "@/lib/api";
 import { useDragSort } from "@/hooks/useDragSort";
 import { useStreamCheck } from "@/hooks/useStreamCheck";
 import { ProviderCard } from "@/components/providers/ProviderCard";
-import { ProviderEmptyState } from "@/components/providers/ProviderEmptyState";
+import {
+  ProviderEmptyState,
+  ProviderQuickSetupCard,
+} from "@/components/providers/ProviderEmptyState";
 import {
   useAutoFailoverEnabled,
   useFailoverQueue,
@@ -295,6 +298,15 @@ export function ProviderList({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {sortedProviders.length > 0 && onQuickApply && (
+        <div className="flex justify-center">
+          <ProviderQuickSetupCard
+            appId={appId}
+            onQuickApply={onQuickApply}
+          />
+        </div>
+      )}
 
       {filteredProviders.length === 0 ? (
         <div className="px-6 py-8 text-sm text-center border border-dashed rounded-lg border-border text-muted-foreground">

@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 type QuickPreset = {
   name: string;
   websiteUrl: string;
+  apiKeyUrl?: string;
   settingsConfig: Record<string, any>;
   category?: Provider["category"];
   icon?: string;
@@ -25,6 +26,12 @@ interface ProviderEmptyStateProps {
   appId: AppId;
   onCreate?: () => void;
   onQuickApply?: (provider: Omit<Provider, "id">) => Promise<void>;
+}
+
+interface ProviderQuickSetupCardProps {
+  appId: AppId;
+  onQuickApply?: (provider: Omit<Provider, "id">) => Promise<void>;
+  className?: string;
 }
 
 const normalizeUrl = (url?: string) => (url || "").trim().replace(/\/+$/, "");
@@ -57,6 +64,7 @@ const getQuickPreset = (appId: AppId): QuickPreset | null => {
     return {
       name: preset.name,
       websiteUrl: preset.websiteUrl,
+      apiKeyUrl: preset.apiKeyUrl,
       settingsConfig: preset.settingsConfig as Record<string, any>,
       category: preset.category,
       icon: preset.icon,
@@ -71,6 +79,7 @@ const getQuickPreset = (appId: AppId): QuickPreset | null => {
     return {
       name: preset.name,
       websiteUrl: preset.websiteUrl,
+      apiKeyUrl: preset.apiKeyUrl,
       settingsConfig: {
         auth: preset.auth,
         config: preset.config,
@@ -88,6 +97,7 @@ const getQuickPreset = (appId: AppId): QuickPreset | null => {
     return {
       name: preset.name,
       websiteUrl: preset.websiteUrl,
+      apiKeyUrl: preset.apiKeyUrl,
       settingsConfig: preset.settingsConfig as Record<string, any>,
       category: preset.category,
       icon: preset.icon,
@@ -155,11 +165,11 @@ const resolveBaseUrl = (appId: AppId, preset: QuickPreset) => {
   return "";
 };
 
-export function ProviderEmptyState({
+export function ProviderQuickSetupCard({
   appId,
-  onCreate,
   onQuickApply,
-}: ProviderEmptyStateProps) {
+  className,
+}: ProviderQuickSetupCardProps) {
   const { t } = useTranslation();
   const [apiKey, setApiKey] = useState("");
   const [isApplying, setIsApplying] = useState(false);
@@ -173,6 +183,7 @@ export function ProviderEmptyState({
     appId === "codex"
       ? t("providerForm.codexApiKeyAutoFill")
       : t("providerForm.apiKeyAutoFill");
+  const apiKeyLink = (preset?.apiKeyUrl || preset?.websiteUrl || "").trim();
 
   const canApply = Boolean(onQuickApply) && apiKey.trim() && !isApplying;
 
@@ -206,6 +217,74 @@ export function ProviderEmptyState({
     }
   }, [apiKey, appId, onQuickApply, preset]);
 
+  if (!preset) return null;
+
+  const cardClassName = [
+    "w-full max-w-2xl rounded-lg border bg-card p-6 text-left shadow-sm",
+    className,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return (
+    <div className={cardClassName}>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-muted">
+            <ProviderIcon
+              icon={preset.icon}
+              name={preset.name}
+              color={preset.iconColor}
+              size={28}
+            />
+          </div>
+          <div>
+            <div className="text-sm font-semibold text-foreground">
+              {preset.name}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {preset.websiteUrl}
+            </div>
+          </div>
+        </div>
+        <Button onClick={handleApply} disabled={!canApply}>
+          {t("provider.applyConfiguration")}
+        </Button>
+      </div>
+
+      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <ApiKeyInput value={apiKey} onChange={setApiKey} required />
+          {apiKeyLink && (
+            <a
+              href={apiKeyLink}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs text-primary hover:underline"
+            >
+              {t("providerForm.getApiKey")}
+            </a>
+          )}
+        </div>
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-foreground">
+            {t("providerForm.apiEndpoint")}
+          </label>
+          <Input value={baseUrl} readOnly className="bg-muted/40" />
+        </div>
+      </div>
+      <p className="mt-3 text-xs text-muted-foreground">{apiKeyHint}</p>
+    </div>
+  );
+}
+
+export function ProviderEmptyState({
+  appId,
+  onCreate,
+  onQuickApply,
+}: ProviderEmptyStateProps) {
+  const { t } = useTranslation();
+
   return (
     <div className="flex flex-col items-center justify-center gap-6 rounded-lg border border-dashed border-border p-10 text-center">
       <div className="mb-2 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
@@ -218,50 +297,7 @@ export function ProviderEmptyState({
         </p>
       </div>
 
-      {preset && (
-        <div className="w-full max-w-2xl rounded-lg border bg-card p-6 text-left shadow-sm">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-muted">
-                <ProviderIcon
-                  icon={preset.icon}
-                  name={preset.name}
-                  color={preset.iconColor}
-                  size={28}
-                />
-              </div>
-              <div>
-                <div className="text-sm font-semibold text-foreground">
-                  {preset.name}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {preset.websiteUrl}
-                </div>
-              </div>
-            </div>
-            <Button onClick={handleApply} disabled={!canApply}>
-              {t("provider.applyConfiguration")}
-            </Button>
-          </div>
-
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <ApiKeyInput
-              value={apiKey}
-              onChange={setApiKey}
-              required
-            />
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-foreground">
-                {t("providerForm.apiEndpoint")}
-              </label>
-              <Input value={baseUrl} readOnly className="bg-muted/40" />
-            </div>
-          </div>
-          <p className="mt-3 text-xs text-muted-foreground">
-            {apiKeyHint}
-          </p>
-        </div>
-      )}
+      <ProviderQuickSetupCard appId={appId} onQuickApply={onQuickApply} />
 
       {onCreate && (
         <Button className="mt-2" onClick={onCreate} variant="outline">

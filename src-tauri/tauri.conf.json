@@ -5,7 +5,7 @@
   "identifier": "com.aicodewith.desktop",
   "build": {
     "frontendDist": "../dist",
-    "devUrl": "http://localhost:3007",
+    "devUrl": "http://127.0.0.1:3007",
     "beforeDevCommand": "pnpm run dev:renderer",
     "beforeBuildCommand": "pnpm run build:renderer"
   },
