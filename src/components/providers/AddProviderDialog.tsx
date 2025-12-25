@@ -17,7 +17,7 @@ interface AddProviderDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   appId: AppId;
-  onSubmit: (provider: Omit<Provider, "id">) => Promise<void> | void;
+  onSubmit: (provider: Omit<Provider, "id">) => Promise<Provider | void> | void;
 }
 
 export function AddProviderDialog({

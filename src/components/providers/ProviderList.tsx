@@ -42,6 +42,7 @@ interface ProviderListProps {
   onConfigureUsage?: (provider: Provider) => void;
   onOpenWebsite: (url: string) => void;
   onCreate?: () => void;
+  onQuickApply?: (provider: Omit<Provider, "id">) => Promise<void>;
   isLoading?: boolean;
   isProxyRunning?: boolean; // 代理服务运行状态
   isProxyTakeover?: boolean; // 代理接管模式（Live配置已被接管）
@@ -59,6 +60,7 @@ export function ProviderList({
   onConfigureUsage,
   onOpenWebsite,
   onCreate,
+  onQuickApply,
   isLoading = false,
   isProxyRunning = false,
   isProxyTakeover = false,
@@ -177,7 +179,13 @@ export function ProviderList({
   }
 
   if (sortedProviders.length === 0) {
-    return <ProviderEmptyState onCreate={onCreate} />;
+    return (
+      <ProviderEmptyState
+        appId={appId}
+        onCreate={onCreate}
+        onQuickApply={onQuickApply}
+      />
+    );
   }
 
   const renderProviderList = () => (

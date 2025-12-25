@@ -32,57 +32,21 @@ export interface GeminiProviderPreset {
 
 export const geminiProviderPresets: GeminiProviderPreset[] = [
   {
-    name: "Google Official",
-    websiteUrl: "https://ai.google.dev/",
-    apiKeyUrl: "https://aistudio.google.com/apikey",
-    settingsConfig: {
-      env: {},
-    },
-    description: "Google 官方 Gemini API (OAuth)",
-    category: "official",
-    partnerPromotionKey: "google-official",
-    theme: {
-      icon: "gemini",
-      backgroundColor: "#4285F4",
-      textColor: "#FFFFFF",
-    },
-    icon: "gemini",
-    iconColor: "#4285F4",
-  },
-  {
-    name: "PackyCode",
-    websiteUrl: "https://www.packyapi.com",
-    apiKeyUrl: "https://www.packyapi.com/register?aff=cc-switch",
+    name: "AI Code With",
+    websiteUrl: "https://aicodewith.com",
     settingsConfig: {
       env: {
-        GOOGLE_GEMINI_BASE_URL: "https://www.packyapi.com",
+        GOOGLE_GEMINI_BASE_URL: "https://api.aicodewith.com/gemini_cli",
         GEMINI_MODEL: "gemini-3-pro-preview",
       },
     },
-    baseURL: "https://www.packyapi.com",
+    baseURL: "https://api.aicodewith.com/gemini_cli",
     model: "gemini-3-pro-preview",
-    description: "PackyCode",
+    description: "AI Code With",
     category: "third_party",
-    isPartner: true,
-    partnerPromotionKey: "packycode",
-    endpointCandidates: [
-      "https://api-slb.packyapi.com",
-      "https://www.packyapi.com",
-    ],
-    icon: "packycode",
-  },
-  {
-    name: "自定义",
-    websiteUrl: "",
-    settingsConfig: {
-      env: {
-        GOOGLE_GEMINI_BASE_URL: "",
-        GEMINI_MODEL: "gemini-3-pro-preview",
-      },
-    },
-    model: "gemini-3-pro-preview",
-    description: "自定义 Gemini API 端点",
-    category: "custom",
+    endpointCandidates: ["https://api.aicodewith.com/gemini_cli"],
+    icon: "aicodewith",
+    iconColor: "#111111",
   },
 ];
 
@@ -102,3 +66,4 @@ export function getGeminiPresetByUrl(
       url.toLowerCase().includes(preset.baseURL.toLowerCase()),
   );
 }
+

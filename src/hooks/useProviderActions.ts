@@ -55,7 +55,7 @@ export function useProviderActions(activeApp: AppId) {
   // 添加供应商
   const addProvider = useCallback(
     async (provider: Omit<Provider, "id">) => {
-      await addProviderMutation.mutateAsync(provider);
+      return await addProviderMutation.mutateAsync(provider);
     },
     [addProviderMutation],
   );

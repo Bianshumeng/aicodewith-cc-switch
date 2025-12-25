@@ -79,6 +79,7 @@
     "addCodexProvider": "Add Codex Provider",
     "addGeminiProvider": "Add Gemini Provider",
     "addProviderHint": "Fill in the information to quickly switch providers in the list.",
+    "applyConfiguration": "Apply Configuration",
     "editClaudeProvider": "Edit Claude Code Provider",
     "editCodexProvider": "Edit Codex Provider",
     "configError": "Configuration Error",

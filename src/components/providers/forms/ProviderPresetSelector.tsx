@@ -121,19 +121,6 @@ export function ProviderPresetSelector({
     <div className="space-y-3">
       <FormLabel>{t("providerPreset.label")}</FormLabel>
       <div className="flex flex-wrap gap-2">
-        {/* 自定义按钮 */}
-        <button
-          type="button"
-          onClick={() => onPresetChange("custom")}
-          className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            selectedPresetId === "custom"
-              ? "bg-blue-500 text-white dark:bg-blue-600"
-              : "bg-accent text-muted-foreground hover:bg-accent/80"
-          }`}
-        >
-          {t("providerPreset.custom")}
-        </button>
-
         {/* 预设按钮 */}
         {categoryKeys.map((category) => {
           const entries = groupedPresets[category];
@@ -163,6 +150,19 @@ export function ProviderPresetSelector({
             );
           });
         })}
+
+        {/* 自定义按钮 */}
+        <button
+          type="button"
+          onClick={() => onPresetChange("custom")}
+          className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            selectedPresetId === "custom"
+              ? "bg-blue-500 text-white dark:bg-blue-600"
+              : "bg-accent text-muted-foreground hover:bg-accent/80"
+          }`}
+        >
+          {t("providerPreset.custom")}
+        </button>
       </div>
       <p className="text-xs text-muted-foreground">{getCategoryHint()}</p>
     </div>

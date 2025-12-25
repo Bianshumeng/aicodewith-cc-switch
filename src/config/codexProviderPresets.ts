@@ -63,94 +63,24 @@ requires_openai_auth = true`;
 
 export const codexProviderPresets: CodexProviderPreset[] = [
   {
-    name: "OpenAI Official",
-    websiteUrl: "https://chatgpt.com/codex",
-    isOfficial: true,
-    category: "official",
-    auth: {},
-    config: ``,
-    theme: {
-      icon: "codex",
-      backgroundColor: "#1F2937", // gray-800
-      textColor: "#FFFFFF",
-    },
-    icon: "openai",
-    iconColor: "#00A67E",
-  },
-  {
-    name: "Azure OpenAI",
-    websiteUrl:
-      "https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/codex",
-    category: "third_party",
-    isOfficial: true,
+    name: "AI Code With",
+    websiteUrl: "https://aicodewith.com",
+    category: "aggregator",
     auth: generateThirdPartyAuth(""),
-    config: `model_provider = "azure"
-model = "gpt-5.1-codex"
+    config: `model_provider = "aicodewith"
+model = "gpt-5.2"
 model_reasoning_effort = "high"
 disable_response_storage = true
+preferred_auth_method = "apikey"
+requires_openai_auth = true
 
-[model_providers.azure]
-name = "Azure OpenAI"
-base_url = "https://YOUR_RESOURCE_NAME.openai.azure.com/openai"
-env_key = "OPENAI_API_KEY"
-query_params = { "api-version" = "2025-04-01-preview" }
-wire_api = "responses"
-requires_openai_auth = true`,
-    endpointCandidates: ["https://YOUR_RESOURCE_NAME.openai.azure.com/openai"],
-    theme: {
-      icon: "codex",
-      backgroundColor: "#0078D4",
-      textColor: "#FFFFFF",
-    },
-    icon: "azure",
-    iconColor: "#0078D4",
-  },
-  {
-    name: "AiHubMix",
-    websiteUrl: "https://aihubmix.com",
-    category: "aggregator",
-    auth: generateThirdPartyAuth(""),
-    config: generateThirdPartyConfig(
-      "aihubmix",
-      "https://aihubmix.com/v1",
-      "gpt-5.1-codex",
-    ),
-    endpointCandidates: [
-      "https://aihubmix.com/v1",
-      "https://api.aihubmix.com/v1",
-    ],
-  },
-  {
-    name: "DMXAPI",
-    websiteUrl: "https://www.dmxapi.cn",
-    category: "aggregator",
-    auth: generateThirdPartyAuth(""),
-    config: generateThirdPartyConfig(
-      "dmxapi",
-      "https://www.dmxapi.cn/v1",
-      "gpt-5.1-codex",
-    ),
-    endpointCandidates: ["https://www.dmxapi.cn/v1"],
-    isPartner: true, // 合作伙伴
-    partnerPromotionKey: "dmxapi", // 促销信息 i18n key
-  },
-  {
-    name: "PackyCode",
-    websiteUrl: "https://www.packyapi.com",
-    apiKeyUrl: "https://www.packyapi.com/register?aff=cc-switch",
-    category: "third_party",
-    auth: generateThirdPartyAuth(""),
-    config: generateThirdPartyConfig(
-      "packycode",
-      "https://www.packyapi.com/v1",
-      "gpt-5.1-codex",
-    ),
-    endpointCandidates: [
-      "https://www.packyapi.com/v1",
-      "https://api-slb.packyapi.com/v1",
-    ],
-    isPartner: true, // 合作伙伴
-    partnerPromotionKey: "packycode", // 促销信息 i18n key
-    icon: "packycode",
+[model_providers.aicodewith]
+name = "aicodewith"
+base_url = "https://api.aicodewith.com/chatgpt/v1"
+wire_api = "responses"`,
+    endpointCandidates: ["https://api.aicodewith.com/chatgpt/v1"],
+    icon: "aicodewith",
+    iconColor: "#111111",
   },
 ];
+

@@ -79,6 +79,7 @@
     "addCodexProvider": "添加 Codex 供应商",
     "addGeminiProvider": "添加 Gemini 供应商",
     "addProviderHint": "填写信息后即可在列表中快速切换供应商。",
+    "applyConfiguration": "应用配置",
     "editClaudeProvider": "编辑 Claude Code 供应商",
     "editCodexProvider": "编辑 Codex 供应商",
     "configError": "配置错误",

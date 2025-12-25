@@ -302,6 +302,14 @@ function App() {
     await addProvider(duplicatedProvider);
   };
 
+  const handleQuickApplyProvider = async (
+    provider: Omit<Provider, "id">,
+  ) => {
+    const createdProvider = await addProvider(provider);
+    if (!createdProvider) return;
+    await switchProvider(createdProvider);
+  };
+
   // 导入配置成功后刷新
   const handleImportSuccess = async () => {
     try {
@@ -395,6 +403,7 @@ function App() {
                       onConfigureUsage={setUsageProvider}
                       onOpenWebsite={handleOpenWebsite}
                       onCreate={() => setIsAddOpen(true)}
+                      onQuickApply={handleQuickApplyProvider}
                     />
                   </motion.div>
                 </AnimatePresence>
@@ -500,7 +509,7 @@ function App() {
               <>
                 <div className="flex items-center gap-2">
                   <a
-                    href="https://github.com/farion1231/cc-switch"
+                    href="https://aicodewith.com"
                     target="_blank"
                     rel="noreferrer"
                     className={cn(
@@ -510,7 +519,7 @@ function App() {
                         : "text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300",
                     )}
                   >
-                    CC Switch
+                    AI Code With
                   </a>
                   <Button
                     variant="ghost"

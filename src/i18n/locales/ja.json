@@ -79,6 +79,7 @@
     "addCodexProvider": "Codex プロバイダーを追加",
     "addGeminiProvider": "Gemini プロバイダーを追加",
     "addProviderHint": "一覧にすばやく切り替えられるよう、ここに情報を入力してください。",
+    "applyConfiguration": "設定を適用",
     "editClaudeProvider": "Claude Code プロバイダーを編集",
     "editCodexProvider": "Codex プロバイダーを編集",
     "configError": "設定エラー",
