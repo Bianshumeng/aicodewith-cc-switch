@@ -288,6 +288,17 @@ impl Database {
         Ok(())
     }
 
+    /// 删除指定应用的所有供应商
+    pub fn delete_providers_by_app_type(&self, app_type: &str) -> Result<(), AppError> {
+        let conn = lock_conn!(self.conn);
+        conn.execute(
+            "DELETE FROM providers WHERE app_type = ?1",
+            params![app_type],
+        )
+        .map_err(|e| AppError::Database(e.to_string()))?;
+        Ok(())
+    }
+
     /// 设置当前供应商
     pub fn set_current_provider(&self, app_type: &str, id: &str) -> Result<(), AppError> {
         let mut conn = lock_conn!(self.conn);
