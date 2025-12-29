@@ -57,12 +57,13 @@ curl http://<server-host>:8080/healthz
 - 若使用宝塔反代，请将 `/admin` 与 `/api` 一并代理到管理端服务
 - 若仅使用宝塔 Basic Auth，可在 UI 留空 Token（需确保反代透传鉴权头）
 
-## 客户端对接所需配置
+## 客户端打包所需配置（编译期写入）
 
-客户端运行环境需设置：
+客户端不再支持运行时配置覆盖，打包时需提供：
 
-- `AI_CODE_WITH_MANAGEMENT_URL`（例如 `https://admin.aicodewith.com`）
+- `AI_CODE_WITH_MANAGEMENT_URL`（例如 `http://192.238.232.29:8080`）
 - `AI_CODE_WITH_SYNC_TOKEN`（与 `SYNC_TOKEN` 一致）
+- `AI_CODE_WITH_SYNC_ON_START`（可选，`true` 时启动即同步，用于测试）
 
 ## 请回传给我以下信息
 

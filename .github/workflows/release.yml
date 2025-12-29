@@ -15,6 +15,10 @@ concurrency:
 jobs:
   release:
     runs-on: ${{ matrix.os }}
+    env:
+      AI_CODE_WITH_MANAGEMENT_URL: ${{ secrets.AI_CODE_WITH_MANAGEMENT_URL }}
+      AI_CODE_WITH_SYNC_TOKEN: ${{ secrets.AI_CODE_WITH_SYNC_TOKEN }}
+      AI_CODE_WITH_SYNC_ON_START: ${{ secrets.AI_CODE_WITH_SYNC_ON_START || 'false' }}
     strategy:
       matrix:
         include:

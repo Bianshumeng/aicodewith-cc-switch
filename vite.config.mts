@@ -1,10 +1,21 @@
 import path from "node:path";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import vitePluginBundleObfuscator from "vite-plugin-bundle-obfuscator";
 
 export default defineConfig({
   root: "src",
-  plugins: [react()],
+  plugins: [
+    react(),
+    ...(process.env.NODE_ENV === "production"
+      ? [
+          vitePluginBundleObfuscator({
+            autoExcludeNodeModules: true,
+            threadPool: true,
+          }),
+        ]
+      : []),
+  ],
   base: "./",
   build: {
     outDir: "../dist",

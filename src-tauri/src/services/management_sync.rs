@@ -2,6 +2,7 @@ use chrono::{DateTime, Datelike, Duration as ChronoDuration, FixedOffset, TimeZo
 use hex::ToHex;
 use indexmap::IndexMap;
 use machine_uid::get as get_machine_uid;
+use once_cell::sync::Lazy;
 use sha2::{Digest, Sha256};
 use std::time::Duration;
 
@@ -14,8 +15,10 @@ use crate::store::AppState;
 const SETTINGS_DEVICE_ID: &str = "management_device_id";
 const SETTINGS_APPLIED_ADMIN_VERSION: &str = "management_admin_version";
 const SETTINGS_LAST_SYNC_AT: &str = "management_last_sync_at";
-const MANAGEMENT_URL_ENV: &str = "AI_CODE_WITH_MANAGEMENT_URL";
-const MANAGEMENT_TOKEN_ENV: &str = "AI_CODE_WITH_SYNC_TOKEN";
+include!(concat!(env!("OUT_DIR"), "/management_secrets.rs"));
+
+static MANAGEMENT_URL: Lazy<String> = Lazy::new(|| decode_secret(MANAGEMENT_URL_BYTES));
+static MANAGEMENT_TOKEN: Lazy<String> = Lazy::new(|| decode_secret(MANAGEMENT_TOKEN_BYTES));
 
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -54,12 +57,22 @@ pub struct ManagementSyncService;
 
 impl ManagementSyncService {
     pub fn start(app_handle: tauri::AppHandle) {
+        if SYNC_ON_START {
+            let startup_handle = app_handle.clone();
+            tauri::async_runtime::spawn(async move {
+                if let Err(err) = Self::run_once(&startup_handle).await {
+                    log::warn!("Management startup sync failed: {err}");
+                }
+            });
+        }
+
+        let scheduler_handle = app_handle.clone();
         tauri::async_runtime::spawn(async move {
             loop {
                 let delay = next_beijing_4am_delay();
                 tokio::time::sleep(delay).await;
 
-                if let Err(err) = Self::run_once(&app_handle).await {
+                if let Err(err) = Self::run_once(&scheduler_handle).await {
                     log::warn!("Management sync failed: {err}");
                 }
             }
@@ -68,21 +81,19 @@ impl ManagementSyncService {
 
     async fn run_once(app_handle: &tauri::AppHandle) -> Result<(), AppError> {
         let state = app_handle.state::<AppState>();
-        let base_url = match std::env::var(MANAGEMENT_URL_ENV) {
-            Ok(value) if !value.trim().is_empty() => value,
-            _ => {
-                log::info!("Management base URL not configured, skipping sync");
-                return Ok(());
-            }
-        };
+        let base_url = MANAGEMENT_URL.trim();
+        if base_url.is_empty() {
+            return Err(AppError::Message(
+                "Management base URL is empty at build time".to_string(),
+            ));
+        }
 
-        let token = match std::env::var(MANAGEMENT_TOKEN_ENV) {
-            Ok(value) if !value.trim().is_empty() => value,
-            _ => {
-                log::info!("Management token not configured, skipping sync");
-                return Ok(());
-            }
-        };
+        let token = MANAGEMENT_TOKEN.trim();
+        if token.is_empty() {
+            return Err(AppError::Message(
+                "Management token is empty at build time".to_string(),
+            ));
+        }
 
         let device_id = get_or_create_device_id(&state.db)?;
         let applied_admin_version = get_applied_admin_version(&state.db)?;
@@ -257,4 +268,9 @@ fn set_applied_admin_version(db: &crate::database::Database, version: i64) -> Re
 
 fn set_last_sync_at(db: &crate::database::Database, at: DateTime<Utc>) -> Result<(), AppError> {
     db.set_setting(SETTINGS_LAST_SYNC_AT, &at.to_rfc3339())
+}
+
+fn decode_secret(bytes: &[u8]) -> String {
+    let decoded: Vec<u8> = bytes.iter().map(|value| value ^ MANAGEMENT_XOR_KEY).collect();
+    String::from_utf8(decoded).expect("Invalid management secret encoding")
 }
