@@ -5,16 +5,21 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use base64::{engine::general_purpose, Engine as _};
 use chrono::{DateTime, Utc};
 use maxminddb::Reader;
 use serde::{Deserialize, Serialize};
-use sqlx::{postgres::PgPoolOptions, types::Json as SqlxJson, PgPool};
+use sqlx::{postgres::PgPoolOptions, types::Json as SqlxJson, PgPool, Row};
 use std::{
     env,
     net::{IpAddr, SocketAddr},
+    path::PathBuf,
     sync::Arc,
 };
-use tower_http::trace::TraceLayer;
+use tower_http::{
+    services::{ServeDir, ServeFile},
+    trace::TraceLayer,
+};
 
 #[derive(Clone)]
 struct AppState {
@@ -22,7 +27,10 @@ struct AppState {
     geoip: Option<Arc<Reader<Vec<u8>>>>,
     sync_token: String,
     admin_token: String,
+    admin_basic_user: Option<String>,
+    admin_basic_password: Option<String>,
     trust_proxy: bool,
+    ui_dir: PathBuf,
 }
 
 #[derive(Debug)]
@@ -82,6 +90,68 @@ struct AdminConfigResponse {
     version: i64,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct BatchConfigRequest {
+    device_ids: Vec<String>,
+    config: serde_json::Value,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct BatchConfigResponse {
+    ok: bool,
+    updated: i64,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct DeviceSummary {
+    device_id: String,
+    fingerprint_hash: String,
+    last_seen: Option<DateTime<Utc>>,
+    last_ip: Option<String>,
+    geo_country: Option<String>,
+    geo_region: Option<String>,
+    geo_city: Option<String>,
+    app_version: Option<String>,
+    created_at: Option<DateTime<Utc>>,
+    snapshot_count: i64,
+    last_snapshot_at: Option<DateTime<Utc>>,
+    admin_version: Option<i64>,
+    admin_updated_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DeviceListResponse {
+    devices: Vec<DeviceSummary>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SnapshotItem {
+    id: i64,
+    created_at: DateTime<Utc>,
+    snapshot: serde_json::Value,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AdminConfigItem {
+    version: i64,
+    updated_at: DateTime<Utc>,
+    config: serde_json::Value,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DeviceDetailResponse {
+    device: DeviceSummary,
+    snapshots: Vec<SnapshotItem>,
+    admin_config: Option<AdminConfigItem>,
+}
+
 #[tokio::main]
 async fn main() {
     dotenvy::dotenv().ok();
@@ -96,6 +166,19 @@ async fn main() {
     let trust_proxy = env::var("TRUST_PROXY")
         .map(|value| value == "true")
         .unwrap_or(false);
+    let ui_dir = env::var("UI_DIST_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| PathBuf::from("ui/dist"));
+
+    let (admin_basic_user, admin_basic_password) = match (
+        env::var("ADMIN_BASIC_USER").ok(),
+        env::var("ADMIN_BASIC_PASSWORD").ok(),
+    ) {
+        (Some(user), Some(pass)) if !user.trim().is_empty() && !pass.trim().is_empty() => {
+            (Some(user), Some(pass))
+        }
+        _ => (None, None),
+    };
 
     let geoip = env::var("GEOIP_DB_PATH")
         .ok()
@@ -113,15 +196,35 @@ async fn main() {
         geoip,
         sync_token,
         admin_token,
+        admin_basic_user,
+        admin_basic_password,
         trust_proxy,
+        ui_dir: ui_dir.clone(),
+    };
+
+    let ui_router = if ui_dir.exists() {
+        let index_path = ui_dir.join("index.html");
+        Router::new().nest_service(
+            "/admin",
+            ServeDir::new(ui_dir).not_found_service(ServeFile::new(index_path)),
+        )
+    } else {
+        Router::new()
     };
 
     let app = Router::new()
+        .merge(ui_router)
         .route("/healthz", get(healthz))
         .route("/api/v1/devices/sync", post(sync_device))
+        .route("/api/v1/admin/devices", get(list_devices))
+        .route("/api/v1/admin/devices/:device_id", get(get_device_detail))
         .route(
             "/api/v1/admin/devices/:device_id/config",
             post(upsert_admin_config),
+        )
+        .route(
+            "/api/v1/admin/devices/config/batch",
+            post(batch_admin_config),
         )
         .with_state(state)
         .layer(TraceLayer::new_for_http());
@@ -146,7 +249,7 @@ async fn sync_device(
     headers: HeaderMap,
     Json(payload): Json<SyncRequest>,
 ) -> Result<Json<SyncResponse>, ApiError> {
-    authorize(&headers, &state.sync_token)?;
+    authorize_bearer(&headers, &state.sync_token)?;
 
     if payload.device_id.trim().is_empty() {
         return Err(ApiError::new(StatusCode::BAD_REQUEST, "device_id is required"));
@@ -169,42 +272,204 @@ async fn sync_device(
     }))
 }
 
+async fn list_devices(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<Json<DeviceListResponse>, ApiError> {
+    authorize_admin(&headers, &state)?;
+
+    let rows = sqlx::query(
+        "SELECT d.device_id, d.fingerprint_hash, d.last_seen, d.last_ip, d.geo_country, d.geo_region, d.geo_city,
+                d.app_version, d.created_at,
+                COUNT(s.id) AS snapshot_count,
+                MAX(s.created_at) AS last_snapshot_at,
+                a.version AS admin_version,
+                a.updated_at AS admin_updated_at
+         FROM devices d
+         LEFT JOIN config_snapshots s ON d.device_id = s.device_id
+         LEFT JOIN admin_configs a ON d.device_id = a.device_id
+         GROUP BY d.device_id, d.fingerprint_hash, d.last_seen, d.last_ip, d.geo_country, d.geo_region, d.geo_city,
+                  d.app_version, d.created_at, a.version, a.updated_at
+         ORDER BY d.last_seen DESC NULLS LAST",
+    )
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|err| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))?;
+
+    let devices = rows
+        .into_iter()
+        .map(|row| DeviceSummary {
+            device_id: row.get("device_id"),
+            fingerprint_hash: row.get("fingerprint_hash"),
+            last_seen: row.get("last_seen"),
+            last_ip: row.get("last_ip"),
+            geo_country: row.get("geo_country"),
+            geo_region: row.get("geo_region"),
+            geo_city: row.get("geo_city"),
+            app_version: row.get("app_version"),
+            created_at: row.get("created_at"),
+            snapshot_count: row
+                .try_get::<i64, _>("snapshot_count")
+                .unwrap_or_default(),
+            last_snapshot_at: row.get("last_snapshot_at"),
+            admin_version: row.get("admin_version"),
+            admin_updated_at: row.get("admin_updated_at"),
+        })
+        .collect();
+
+    Ok(Json(DeviceListResponse { devices }))
+}
+
+async fn get_device_detail(
+    State(state): State<AppState>,
+    Path(device_id): Path<String>,
+    headers: HeaderMap,
+) -> Result<Json<DeviceDetailResponse>, ApiError> {
+    authorize_admin(&headers, &state)?;
+
+    let row = sqlx::query(
+        "SELECT device_id, fingerprint_hash, last_seen, last_ip, geo_country, geo_region, geo_city,
+                app_version, created_at
+         FROM devices WHERE device_id = $1",
+    )
+    .bind(&device_id)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|err| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))?;
+
+    let Some(row) = row else {
+        return Err(ApiError::new(StatusCode::NOT_FOUND, "device not found"));
+    };
+
+    let summary_row = sqlx::query(
+        "SELECT COUNT(id) AS snapshot_count, MAX(created_at) AS last_snapshot_at
+         FROM config_snapshots WHERE device_id = $1",
+    )
+    .bind(&device_id)
+    .fetch_one(&state.pool)
+    .await
+    .map_err(|err| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))?;
+
+    let snapshot_rows = sqlx::query(
+        "SELECT id, created_at, snapshot
+         FROM config_snapshots
+         WHERE device_id = $1
+         ORDER BY created_at DESC
+         LIMIT 20",
+    )
+    .bind(&device_id)
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|err| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))?;
+
+    let snapshots = snapshot_rows
+        .into_iter()
+        .map(|row| SnapshotItem {
+            id: row.get("id"),
+            created_at: row.get("created_at"),
+            snapshot: row
+                .try_get::<SqlxJson<serde_json::Value>, _>("snapshot")
+                .map(|value| value.0)
+                .unwrap_or(serde_json::Value::Null),
+        })
+        .collect();
+
+    let admin_row = sqlx::query_as::<_, (i64, SqlxJson<serde_json::Value>, DateTime<Utc>)>(
+        "SELECT version, config, updated_at FROM admin_configs WHERE device_id = $1",
+    )
+    .bind(&device_id)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|err| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))?;
+
+    let admin_config = admin_row.map(|(version, config, updated_at)| AdminConfigItem {
+        version,
+        updated_at,
+        config: config.0,
+    });
+
+    let (admin_version, admin_updated_at) = admin_config
+        .as_ref()
+        .map(|config| (Some(config.version), Some(config.updated_at)))
+        .unwrap_or((None, None));
+
+    let device = DeviceSummary {
+        device_id: row.get("device_id"),
+        fingerprint_hash: row.get("fingerprint_hash"),
+        last_seen: row.get("last_seen"),
+        last_ip: row.get("last_ip"),
+        geo_country: row.get("geo_country"),
+        geo_region: row.get("geo_region"),
+        geo_city: row.get("geo_city"),
+        app_version: row.get("app_version"),
+        created_at: row.get("created_at"),
+        snapshot_count: summary_row
+            .try_get::<i64, _>("snapshot_count")
+            .unwrap_or_default(),
+        last_snapshot_at: summary_row.get("last_snapshot_at"),
+        admin_version,
+        admin_updated_at,
+    };
+
+    Ok(Json(DeviceDetailResponse {
+        device,
+        snapshots,
+        admin_config,
+    }))
+}
+
 async fn upsert_admin_config(
     State(state): State<AppState>,
     Path(device_id): Path<String>,
     headers: HeaderMap,
     Json(payload): Json<AdminConfigRequest>,
 ) -> Result<Json<AdminConfigResponse>, ApiError> {
-    authorize(&headers, &state.admin_token)?;
+    authorize_admin(&headers, &state)?;
 
     if device_id.trim().is_empty() {
         return Err(ApiError::new(StatusCode::BAD_REQUEST, "device_id is required"));
     }
 
     let now = Utc::now();
-    let next_version = fetch_next_admin_version(&state.pool, &device_id).await?;
-
-    sqlx::query(
-        "INSERT INTO admin_configs (device_id, version, config, updated_at)
-         VALUES ($1, $2, $3, $4)
-         ON CONFLICT (device_id)
-         DO UPDATE SET version = EXCLUDED.version, config = EXCLUDED.config, updated_at = EXCLUDED.updated_at",
-    )
-    .bind(&device_id)
-    .bind(next_version)
-    .bind(SqlxJson(payload.config))
-    .bind(now)
-    .execute(&state.pool)
-    .await
-    .map_err(|err| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))?;
+    let version = upsert_admin_config_value(&state.pool, &device_id, &payload.config, now).await?;
 
     Ok(Json(AdminConfigResponse {
         ok: true,
-        version: next_version,
+        version,
     }))
 }
 
-fn authorize(headers: &HeaderMap, expected: &str) -> Result<(), ApiError> {
+async fn batch_admin_config(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(payload): Json<BatchConfigRequest>,
+) -> Result<Json<BatchConfigResponse>, ApiError> {
+    authorize_admin(&headers, &state)?;
+
+    if payload.device_ids.is_empty() {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "device_ids is required"));
+    }
+
+    let existing_ids = sqlx::query_scalar::<_, String>(
+        "SELECT device_id FROM devices WHERE device_id = ANY($1)",
+    )
+    .bind(&payload.device_ids)
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|err| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))?;
+
+    let now = Utc::now();
+    let mut updated = 0;
+
+    for device_id in existing_ids {
+        upsert_admin_config_value(&state.pool, &device_id, &payload.config, now).await?;
+        updated += 1;
+    }
+
+    Ok(Json(BatchConfigResponse { ok: true, updated }))
+}
+
+fn authorize_bearer(headers: &HeaderMap, expected: &str) -> Result<(), ApiError> {
     let auth = headers
         .get(axum::http::header::AUTHORIZATION)
         .and_then(|value| value.to_str().ok())
@@ -215,6 +480,43 @@ fn authorize(headers: &HeaderMap, expected: &str) -> Result<(), ApiError> {
     }
 
     Ok(())
+}
+
+fn authorize_admin(headers: &HeaderMap, state: &AppState) -> Result<(), ApiError> {
+    if let Some(token) = extract_bearer_token(headers) {
+        if token == state.admin_token {
+            return Ok(());
+        }
+    }
+
+    if let (Some(user), Some(pass)) = (&state.admin_basic_user, &state.admin_basic_password) {
+        if let Some((input_user, input_pass)) = extract_basic_auth(headers) {
+            if input_user == *user && input_pass == *pass {
+                return Ok(());
+            }
+        }
+    }
+
+    Err(ApiError::new(StatusCode::UNAUTHORIZED, "unauthorized"))
+}
+
+fn extract_bearer_token(headers: &HeaderMap) -> Option<String> {
+    let auth = headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())?;
+    let token = auth.strip_prefix("Bearer ")?;
+    Some(token.to_string())
+}
+
+fn extract_basic_auth(headers: &HeaderMap) -> Option<(String, String)> {
+    let auth = headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())?;
+    let encoded = auth.strip_prefix("Basic ")?;
+    let decoded = general_purpose::STANDARD.decode(encoded).ok()?;
+    let decoded = String::from_utf8_lossy(&decoded);
+    let (user, pass) = decoded.split_once(':')?;
+    Some((user.to_string(), pass.to_string()))
 }
 
 fn extract_ip(headers: &HeaderMap, addr: SocketAddr, trust_proxy: bool) -> Option<IpAddr> {
@@ -244,7 +546,7 @@ fn lookup_geo(geoip: &Option<Arc<Reader<Vec<u8>>>>, ip: IpAddr) -> Option<GeoRes
         .and_then(|subs| subs.first().and_then(|sub| sub.iso_code.map(|code| code.to_string())));
     let city = result
         .city
-        .and_then(|city| city.names.and_then(|names| names.get("en").cloned()));
+        .and_then(|city| city.names.and_then(|names| names.get("en").map(|value| value.to_string())));
 
     Some(GeoResult {
         country,
@@ -344,16 +646,27 @@ async fn fetch_admin_config(
     }))
 }
 
-async fn fetch_next_admin_version(pool: &PgPool, device_id: &str) -> Result<i64, ApiError> {
-    let row = sqlx::query_as::<_, (i64,)>(
-        "SELECT version FROM admin_configs WHERE device_id = $1",
+async fn upsert_admin_config_value(
+    pool: &PgPool,
+    device_id: &str,
+    config: &serde_json::Value,
+    now: DateTime<Utc>,
+) -> Result<i64, ApiError> {
+    let version = sqlx::query_scalar(
+        "INSERT INTO admin_configs (device_id, version, config, updated_at)
+         VALUES ($1, 1, $2, $3)
+         ON CONFLICT (device_id)
+         DO UPDATE SET version = admin_configs.version + 1, config = EXCLUDED.config, updated_at = EXCLUDED.updated_at
+         RETURNING version",
     )
     .bind(device_id)
-    .fetch_optional(pool)
+    .bind(SqlxJson(config.clone()))
+    .bind(now)
+    .fetch_one(pool)
     .await
     .map_err(|err| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))?;
 
-    Ok(row.map(|(version,)| version + 1).unwrap_or(1))
+    Ok(version)
 }
 
 fn require_env(key: &str) -> String {

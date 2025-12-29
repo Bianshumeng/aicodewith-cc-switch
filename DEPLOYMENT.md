@@ -10,6 +10,7 @@
 - 是否经过反向代理（决定 `TRUST_PROXY`）
 - PostgreSQL 账号/密码/库名
 - `SYNC_TOKEN` 与 `ADMIN_TOKEN`（建议随机生成）
+- （可选）`ADMIN_BASIC_USER` / `ADMIN_BASIC_PASSWORD`（Basic Auth）
 - 是否启用 GeoIP（需要 GeoLite2-City.mmdb 路径）
 
 ## 快速部署步骤（Docker Compose）
@@ -24,6 +25,8 @@ POSTGRES_PASSWORD=change_me
 DATABASE_URL=postgresql://ccswitch:change_me@db:5432/ccswitch
 SYNC_TOKEN=sync_secret_here
 ADMIN_TOKEN=admin_secret_here
+ADMIN_BASIC_USER=admin
+ADMIN_BASIC_PASSWORD=change_me
 TRUST_PROXY=false
 ```
 
@@ -48,6 +51,12 @@ docker compose exec -T db psql -U ccswitch -d ccswitch < server/migrations/20251
 curl http://<server-host>:8080/healthz
 ```
 
+## 管理端 UI
+
+- 默认访问路径：`/admin`
+- 若使用宝塔反代，请将 `/admin` 与 `/api` 一并代理到管理端服务
+- 若仅使用宝塔 Basic Auth，可在 UI 留空 Token（需确保反代透传鉴权头）
+
 ## 客户端对接所需配置
 
 客户端运行环境需设置：
@@ -61,4 +70,3 @@ curl http://<server-host>:8080/healthz
 - `SYNC_TOKEN`
 - `ADMIN_TOKEN`
 - 是否启用反向代理（以及是否设置 `TRUST_PROXY=true`）
-

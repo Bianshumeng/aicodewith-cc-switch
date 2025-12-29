@@ -19,9 +19,12 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       SYNC_TOKEN: ${SYNC_TOKEN}
       ADMIN_TOKEN: ${ADMIN_TOKEN}
+      ADMIN_BASIC_USER: ${ADMIN_BASIC_USER:-}
+      ADMIN_BASIC_PASSWORD: ${ADMIN_BASIC_PASSWORD:-}
       BIND_ADDR: 0.0.0.0:8080
       GEOIP_DB_PATH: /data/GeoLite2-City.mmdb
       TRUST_PROXY: ${TRUST_PROXY:-false}
+      UI_DIST_DIR: /app/ui
     volumes:
       - ./server/migrations:/app/migrations:ro
       - ./geoip:/data:ro

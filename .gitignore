@@ -1,4 +1,6 @@
 node_modules/
+server/ui/node_modules/
+server/ui/dist/
 dist/
 release/
 .DS_Store
