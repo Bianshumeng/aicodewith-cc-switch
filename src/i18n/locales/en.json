@@ -244,6 +244,8 @@
     "checking": "Checking...",
     "upToDate": "Up to Date",
     "aboutHint": "View version information and update status.",
+    "openSourceNoticeTitle": "Open-source notice",
+    "openSourceNoticeBody": "This software is a derivative work based on the CC Switch open-source project. Copyright of the original project remains with its authors and contributors. This product is not affiliated with the original project.",
     "portableMode": "Portable mode: updates require manual download.",
     "updateAvailable": "New version available: {{version}}",
     "updateFailed": "Update installation failed, attempted to open download page.",

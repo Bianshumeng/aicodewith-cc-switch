@@ -69,6 +69,20 @@ export function AboutSection() {
         </p>
       </header>
 
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.1 }}
+        className="rounded-xl border border-border bg-gradient-to-br from-card/80 to-card/40 p-4 space-y-2 shadow-sm"
+      >
+        <h4 className="text-sm font-medium">
+          {t("settings.openSourceNoticeTitle")}
+        </h4>
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          {t("settings.openSourceNoticeBody")}
+        </p>
+      </motion.div>
+
       <div className="space-y-3">
         <div className="flex items-center justify-between px-1">
           <h3 className="text-sm font-medium">{t("settings.localEnvCheck")}</h3>

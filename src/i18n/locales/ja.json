@@ -244,6 +244,8 @@
     "checking": "確認中...",
     "upToDate": "最新バージョンです",
     "aboutHint": "バージョン情報と更新状況を表示します。",
+    "openSourceNoticeTitle": "オープンソースに関する声明",
+    "openSourceNoticeBody": "本ソフトウェアは CC Switch のオープンソースプロジェクトを基にした二次開発です。原プロジェクトの著作権は原作者および貢献者に帰属し、本製品は原プロジェクトと提携関係にありません。",
     "portableMode": "ポータブルモード: 更新は手動ダウンロードが必要です。",
     "updateAvailable": "新しいバージョンがあります: {{version}}",
     "updateFailed": "更新のインストールに失敗しました。ダウンロードページを開こうとしました。",

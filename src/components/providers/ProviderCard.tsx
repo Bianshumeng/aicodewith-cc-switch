@@ -29,11 +29,8 @@ interface ProviderCardProps {
   onSwitch: (provider: Provider) => void;
   onEdit: (provider: Provider) => void;
   onDelete: (provider: Provider) => void;
-  onConfigureUsage: (provider: Provider) => void;
   onOpenWebsite: (url: string) => void;
   onDuplicate: (provider: Provider) => void;
-  onTest?: (provider: Provider) => void;
-  isTesting?: boolean;
   isProxyRunning: boolean;
   isProxyTakeover?: boolean; // 代理接管模式（Live配置已被接管，切换为热切换）
   dragHandleProps?: DragHandleProps;
@@ -87,11 +84,8 @@ export function ProviderCard({
   onSwitch,
   onEdit,
   onDelete,
-  onConfigureUsage,
   onOpenWebsite,
   onDuplicate,
-  onTest,
-  isTesting,
   isProxyRunning,
   isProxyTakeover = false,
   dragHandleProps,
@@ -331,13 +325,10 @@ export function ProviderCard({
           <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-1.5 opacity-0 pointer-events-none group-hover:opacity-100 group-focus-within:opacity-100 group-hover:pointer-events-auto group-focus-within:pointer-events-auto transition-all duration-200 translate-x-2 group-hover:translate-x-0 group-focus-within:translate-x-0">
             <ProviderActions
               isCurrent={isCurrent}
-              isTesting={isTesting}
               isProxyTakeover={isProxyTakeover}
               onSwitch={() => onSwitch(provider)}
               onEdit={() => onEdit(provider)}
               onDuplicate={() => onDuplicate(provider)}
-              onTest={onTest ? () => onTest(provider) : undefined}
-              onConfigureUsage={() => onConfigureUsage(provider)}
               onDelete={() => onDelete(provider)}
               // 故障转移相关
               isAutoFailoverEnabled={isAutoFailoverEnabled}

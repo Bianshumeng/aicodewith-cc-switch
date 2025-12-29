@@ -244,6 +244,8 @@
     "checking": "检查中...",
     "upToDate": "已是最新",
     "aboutHint": "查看版本信息与更新状态。",
+    "openSourceNoticeTitle": "开源项目声明",
+    "openSourceNoticeBody": "本软件基于 CC Switch 开源项目二次开发，原项目版权归原作者及贡献者所有，本产品与原项目无隶属或授权关系。",
     "portableMode": "当前为便携版，更新需手动下载。",
     "updateAvailable": "检测到新版本：{{version}}",
     "updateFailed": "更新安装失败，已尝试打开下载页面。",

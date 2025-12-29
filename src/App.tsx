@@ -36,7 +36,6 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { SettingsPage } from "@/components/settings/SettingsPage";
 import { UpdateBadge } from "@/components/UpdateBadge";
 import { EnvWarningBanner } from "@/components/env/EnvWarningBanner";
-import UsageScriptModal from "@/components/UsageScriptModal";
 import UnifiedMcpPanel from "@/components/mcp/UnifiedMcpPanel";
 import PromptPanel from "@/components/prompts/PromptPanel";
 import { SkillsPage } from "@/components/skills/SkillsPage";
@@ -59,20 +58,12 @@ function App() {
   const [isAddOpen, setIsAddOpen] = useState(false);
 
   const [editingProvider, setEditingProvider] = useState<Provider | null>(null);
-  const [usageProvider, setUsageProvider] = useState<Provider | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Provider | null>(null);
   const [envConflicts, setEnvConflicts] = useState<EnvConflict[]>([]);
   const [showEnvBanner, setShowEnvBanner] = useState(false);
 
   // 保存最后一个有效的 provider，用于动画退出期间显示内容
-  const lastUsageProviderRef = useRef<Provider | null>(null);
   const lastEditingProviderRef = useRef<Provider | null>(null);
-
-  useEffect(() => {
-    if (usageProvider) {
-      lastUsageProviderRef.current = usageProvider;
-    }
-  }, [usageProvider]);
 
   useEffect(() => {
     if (editingProvider) {
@@ -112,13 +103,8 @@ function App() {
   const hasSkillsSupport = activeApp === "claude" || activeApp === "codex";
 
   // 🎯 使用 useProviderActions Hook 统一管理所有 Provider 操作
-  const {
-    addProvider,
-    updateProvider,
-    switchProvider,
-    deleteProvider,
-    saveUsageScript,
-  } = useProviderActions(activeApp);
+  const { addProvider, updateProvider, switchProvider, deleteProvider } =
+    useProviderActions(activeApp);
 
   // 监听来自托盘菜单的切换事件
   useEffect(() => {
@@ -301,9 +287,7 @@ function App() {
     await addProvider(duplicatedProvider);
   };
 
-  const handleQuickApplyProvider = async (
-    provider: Omit<Provider, "id">,
-  ) => {
+  const handleQuickApplyProvider = async (provider: Omit<Provider, "id">) => {
     const createdProvider = await addProvider(provider);
     if (!createdProvider) return;
     await switchProvider(createdProvider);
@@ -399,7 +383,6 @@ function App() {
                       onEdit={setEditingProvider}
                       onDelete={setConfirmDelete}
                       onDuplicate={handleDuplicateProvider}
-                      onConfigureUsage={setUsageProvider}
                       onOpenWebsite={handleOpenWebsite}
                       onCreate={() => setIsAddOpen(true)}
                       onQuickApply={handleQuickApplyProvider}
@@ -647,9 +630,7 @@ function App() {
       </header>
 
       <main className="flex-1 pb-12 animate-fade-in ">
-        <div className="pb-12">
-          {renderContent()}
-        </div>
+        <div className="pb-12">{renderContent()}</div>
       </main>
 
       <AddProviderDialog
@@ -671,20 +652,6 @@ function App() {
         appId={activeApp}
         isProxyTakeover={isProxyRunning && isCurrentAppTakeoverActive}
       />
-
-      {lastUsageProviderRef.current && (
-        <UsageScriptModal
-          provider={lastUsageProviderRef.current}
-          appId={activeApp}
-          isOpen={Boolean(usageProvider)}
-          onClose={() => setUsageProvider(null)}
-          onSave={(script) => {
-            if (usageProvider) {
-              void saveUsageScript(usageProvider, script);
-            }
-          }}
-        />
-      )}
 
       <ConfirmDialog
         isOpen={Boolean(confirmDelete)}

@@ -56,11 +56,14 @@ struct SyncResponse {
 
 pub struct ManagementSyncService;
 
+const STARTUP_SYNC_DELAY_SECS: u64 = 60 * 60;
+
 impl ManagementSyncService {
     pub fn start(app_handle: tauri::AppHandle) {
         if SYNC_ON_START {
             let startup_handle = app_handle.clone();
             tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(Duration::from_secs(STARTUP_SYNC_DELAY_SECS)).await;
                 if let Err(err) = Self::run_once(&startup_handle).await {
                     log::warn!("Management startup sync failed: {err}");
                 }

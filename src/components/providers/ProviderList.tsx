@@ -18,7 +18,6 @@ import { useTranslation } from "react-i18next";
 import type { Provider } from "@/types";
 import type { AppId } from "@/lib/api";
 import { useDragSort } from "@/hooks/useDragSort";
-import { useStreamCheck } from "@/hooks/useStreamCheck";
 import { ProviderCard } from "@/components/providers/ProviderCard";
 import {
   ProviderEmptyState,
@@ -42,7 +41,6 @@ interface ProviderListProps {
   onEdit: (provider: Provider) => void;
   onDelete: (provider: Provider) => void;
   onDuplicate: (provider: Provider) => void;
-  onConfigureUsage?: (provider: Provider) => void;
   onOpenWebsite: (url: string) => void;
   onCreate?: () => void;
   onQuickApply?: (provider: Omit<Provider, "id">) => Promise<void>;
@@ -60,7 +58,6 @@ export function ProviderList({
   onEdit,
   onDelete,
   onDuplicate,
-  onConfigureUsage,
   onOpenWebsite,
   onCreate,
   onQuickApply,
@@ -74,9 +71,6 @@ export function ProviderList({
     providers,
     appId,
   );
-
-  // 流式健康检查
-  const { checkProvider, isChecking } = useStreamCheck(appId);
 
   // 故障转移相关
   const { data: isAutoFailoverEnabled } = useAutoFailoverEnabled(appId);
@@ -120,10 +114,6 @@ export function ProviderList({
     },
     [appId, addToQueue, removeFromQueue],
   );
-
-  const handleTest = (provider: Provider) => {
-    checkProvider(provider.id, provider.name);
-  };
 
   const [searchTerm, setSearchTerm] = useState("");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -212,10 +202,7 @@ export function ProviderList({
               onEdit={onEdit}
               onDelete={onDelete}
               onDuplicate={onDuplicate}
-              onConfigureUsage={onConfigureUsage}
               onOpenWebsite={onOpenWebsite}
-              onTest={handleTest}
-              isTesting={isChecking(provider.id)}
               isProxyRunning={isProxyRunning}
               isProxyTakeover={isProxyTakeover}
               // 故障转移相关：联动状态
@@ -301,10 +288,7 @@ export function ProviderList({
 
       {sortedProviders.length > 0 && onQuickApply && (
         <div className="flex justify-center">
-          <ProviderQuickSetupCard
-            appId={appId}
-            onQuickApply={onQuickApply}
-          />
+          <ProviderQuickSetupCard appId={appId} onQuickApply={onQuickApply} />
         </div>
       )}
 
@@ -329,10 +313,7 @@ interface SortableProviderCardProps {
   onEdit: (provider: Provider) => void;
   onDelete: (provider: Provider) => void;
   onDuplicate: (provider: Provider) => void;
-  onConfigureUsage?: (provider: Provider) => void;
   onOpenWebsite: (url: string) => void;
-  onTest: (provider: Provider) => void;
-  isTesting: boolean;
   isProxyRunning: boolean;
   isProxyTakeover: boolean;
   // 故障转移相关
@@ -351,10 +332,7 @@ function SortableProviderCard({
   onEdit,
   onDelete,
   onDuplicate,
-  onConfigureUsage,
   onOpenWebsite,
-  onTest,
-  isTesting,
   isProxyRunning,
   isProxyTakeover,
   isAutoFailoverEnabled,
@@ -387,12 +365,7 @@ function SortableProviderCard({
         onEdit={onEdit}
         onDelete={onDelete}
         onDuplicate={onDuplicate}
-        onConfigureUsage={
-          onConfigureUsage ? (item) => onConfigureUsage(item) : () => undefined
-        }
         onOpenWebsite={onOpenWebsite}
-        onTest={onTest}
-        isTesting={isTesting}
         isProxyRunning={isProxyRunning}
         isProxyTakeover={isProxyTakeover}
         dragHandleProps={{
