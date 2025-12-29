@@ -30,6 +30,29 @@ type AdminConfig = {
   config: unknown;
 };
 
+type ProviderView = {
+  id: string;
+  name: string;
+  category?: string;
+  websiteUrl?: string;
+  icon?: string;
+  iconColor?: string;
+  inFailoverQueue?: boolean;
+  settingsConfig?: unknown;
+  raw: Record<string, unknown>;
+};
+
+type AppSnapshotView = {
+  currentId?: string;
+  providers: ProviderView[];
+};
+
+type DeviceConfigSnapshotView = {
+  claude: AppSnapshotView | null;
+  codex: AppSnapshotView | null;
+  gemini: AppSnapshotView | null;
+};
+
 type DeviceDetail = {
   device: DeviceSummary;
   snapshots: Snapshot[];
@@ -44,7 +67,7 @@ type BatchResponse = {
 async function apiFetch<T>(
   path: string,
   token: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
 ): Promise<T> {
   const headers = new Headers(options.headers);
   headers.set("Content-Type", "application/json");
@@ -66,14 +89,73 @@ function formatDate(value: string | null) {
 }
 
 function normalizeRegion(device: DeviceSummary) {
-  return [device.geoCountry, device.geoRegion, device.geoCity]
-    .filter(Boolean)
-    .join(" / ") || "-";
+  return (
+    [device.geoCountry, device.geoRegion, device.geoCity]
+      .filter(Boolean)
+      .join(" / ") || "-"
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function normalizeProvider(value: unknown, fallbackId: string): ProviderView {
+  const raw = isRecord(value) ? value : {};
+  const id =
+    typeof raw.id === "string" && raw.id.trim() ? raw.id.trim() : fallbackId;
+  const name =
+    typeof raw.name === "string" && raw.name.trim() ? raw.name.trim() : id;
+  return {
+    id,
+    name,
+    category: typeof raw.category === "string" ? raw.category : undefined,
+    websiteUrl: typeof raw.websiteUrl === "string" ? raw.websiteUrl : undefined,
+    icon: typeof raw.icon === "string" ? raw.icon : undefined,
+    iconColor: typeof raw.iconColor === "string" ? raw.iconColor : undefined,
+    inFailoverQueue:
+      typeof raw.inFailoverQueue === "boolean"
+        ? raw.inFailoverQueue
+        : undefined,
+    settingsConfig: raw.settingsConfig,
+    raw: { ...raw, id },
+  };
+}
+
+function normalizeAppSnapshot(value: unknown): AppSnapshotView | null {
+  if (!isRecord(value)) return null;
+  const providersRaw = isRecord(value.providers) ? value.providers : {};
+  const providers = Object.entries(providersRaw).map(([id, provider]) =>
+    normalizeProvider(provider, id),
+  );
+  const currentId =
+    typeof value.currentId === "string" ? value.currentId : undefined;
+
+  if (!currentId && providers.length === 0) {
+    return null;
+  }
+
+  return { currentId, providers };
+}
+
+function normalizeSnapshot(value: unknown): DeviceConfigSnapshotView {
+  const root = isRecord(value) ? value : {};
+  return {
+    claude: normalizeAppSnapshot(root.claude),
+    codex: normalizeAppSnapshot(root.codex),
+    gemini: normalizeAppSnapshot(root.gemini),
+  };
 }
 
 function copyText(text: string) {
   navigator.clipboard.writeText(text).catch(() => undefined);
 }
+
+const PLATFORM_LABELS = [
+  { key: "claude", label: "Claude" },
+  { key: "codex", label: "Codex" },
+  { key: "gemini", label: "Gemini" },
+] as const;
 
 export default function App() {
   const [tokenInput, setTokenInput] = useState("");
@@ -104,7 +186,7 @@ export default function App() {
       setError(null);
       const data = await apiFetch<{ devices: DeviceSummary[] }>(
         "/api/v1/admin/devices",
-        token
+        token,
       );
       setDevices(data.devices);
       if (data.devices.length > 0 && !selectedId) {
@@ -123,7 +205,7 @@ export default function App() {
       try {
         const data = await apiFetch<DeviceDetail>(
           `/api/v1/admin/devices/${selectedId}`,
-          token
+          token,
         );
         setDetail(data);
       } catch (err) {
@@ -188,7 +270,7 @@ export default function App() {
         {
           method: "POST",
           body: JSON.stringify({ deviceIds: ids, config }),
-        }
+        },
       );
       if (result.ok) {
         setModalOpen(false);
@@ -199,12 +281,134 @@ export default function App() {
     }
   }
 
-  const snapshotText = detail?.snapshots[0]
-    ? JSON.stringify(detail.snapshots[0].snapshot, null, 2)
+  const latestSnapshotRaw = detail?.snapshots[0]?.snapshot;
+  const adminConfigRaw = detail?.adminConfig?.config;
+  const snapshotText = latestSnapshotRaw
+    ? JSON.stringify(latestSnapshotRaw, null, 2)
     : "";
-  const adminConfigText = detail?.adminConfig
-    ? JSON.stringify(detail.adminConfig.config, null, 2)
+  const adminConfigText = adminConfigRaw
+    ? JSON.stringify(adminConfigRaw, null, 2)
     : "";
+  const snapshotView = useMemo(
+    () => normalizeSnapshot(latestSnapshotRaw),
+    [latestSnapshotRaw],
+  );
+  const adminConfigView = useMemo(
+    () => normalizeSnapshot(adminConfigRaw),
+    [adminConfigRaw],
+  );
+
+  function renderSnapshotSection(
+    title: string,
+    snapshot: DeviceConfigSnapshotView,
+    rawText: string,
+    emptyLabel: string,
+  ) {
+    return (
+      <div className="snapshot-block">
+        <div className="actions">
+          <h2>{title}</h2>
+          {rawText ? (
+            <button className="copy-btn" onClick={() => copyText(rawText)}>
+              复制 JSON
+            </button>
+          ) : null}
+        </div>
+        {rawText ? (
+          <div className="snapshot-sections">
+            {PLATFORM_LABELS.map((platform) => {
+              const appSnapshot = snapshot[platform.key];
+              const providers = appSnapshot?.providers ?? [];
+              const currentId = appSnapshot?.currentId;
+              const currentProvider = providers.find(
+                (provider) => provider.id === currentId,
+              );
+              const currentLabel = currentProvider?.name ?? currentId ?? "-";
+
+              return (
+                <section className="platform-card" key={platform.key}>
+                  <div className="platform-header">
+                    <div>
+                      <div className="platform-title">{platform.label}</div>
+                      <div className="platform-meta">
+                        当前使用：<strong>{currentLabel}</strong>
+                        <span> · {providers.length} 个配置</span>
+                      </div>
+                    </div>
+                    <span className="platform-badge">{platform.label}</span>
+                  </div>
+                  {providers.length > 0 ? (
+                    <div className="provider-grid">
+                      {providers.map((provider) => {
+                        const providerJson = JSON.stringify(
+                          provider.raw,
+                          null,
+                          2,
+                        );
+                        const isCurrent = currentId === provider.id;
+
+                        return (
+                          <div
+                            key={provider.id}
+                            className={
+                              isCurrent
+                                ? "provider-card current"
+                                : "provider-card"
+                            }
+                          >
+                            <div className="provider-header">
+                              <div className="provider-title">
+                                <span className="provider-dot" />
+                                <div>
+                                  <div className="provider-name">
+                                    {provider.name}
+                                  </div>
+                                  <div className="provider-id">
+                                    {provider.id}
+                                  </div>
+                                </div>
+                                {isCurrent ? (
+                                  <span className="status-pill">当前使用</span>
+                                ) : null}
+                              </div>
+                              <button
+                                className="copy-btn light"
+                                onClick={() => copyText(providerJson)}
+                              >
+                                复制配置
+                              </button>
+                            </div>
+                            <div className="provider-meta">
+                              <span>类别：{provider.category ?? "-"}</span>
+                              <span>站点：{provider.websiteUrl ?? "-"}</span>
+                              <span>
+                                故障转移：
+                                {provider.inFailoverQueue ? "启用" : "关闭"}
+                              </span>
+                            </div>
+                            <pre className="code-block">{providerJson}</pre>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="helper">暂无配置</div>
+                  )}
+                </section>
+              );
+            })}
+
+            <details className="raw-toggle">
+              <summary>查看原始 JSON</summary>
+              <pre className="json-block">{rawText}</pre>
+            </details>
+          </div>
+        ) : (
+          <div className="helper">{emptyLabel}</div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="app">
@@ -344,43 +548,19 @@ export default function App() {
                 <strong>{formatDate(detail.device.adminUpdatedAt)}</strong>
               </div>
 
-              <div>
-                <div className="actions">
-                  <h2>最新配置快照</h2>
-                  {snapshotText ? (
-                    <button
-                      className="copy-btn"
-                      onClick={() => copyText(snapshotText)}
-                    >
-                      复制 JSON
-                    </button>
-                  ) : null}
-                </div>
-                {snapshotText ? (
-                  <pre className="json-block">{snapshotText}</pre>
-                ) : (
-                  <div className="helper">暂无快照</div>
-                )}
-              </div>
+              {renderSnapshotSection(
+                "最新配置快照",
+                snapshotView,
+                snapshotText,
+                "暂无快照",
+              )}
 
-              <div>
-                <div className="actions">
-                  <h2>已下发配置</h2>
-                  {adminConfigText ? (
-                    <button
-                      className="copy-btn"
-                      onClick={() => copyText(adminConfigText)}
-                    >
-                      复制 JSON
-                    </button>
-                  ) : null}
-                </div>
-                {adminConfigText ? (
-                  <pre className="json-block">{adminConfigText}</pre>
-                ) : (
-                  <div className="helper">暂无下发配置</div>
-                )}
-              </div>
+              {renderSnapshotSection(
+                "已下发配置",
+                adminConfigView,
+                adminConfigText,
+                "暂无下发配置",
+              )}
             </div>
           )}
         </section>
@@ -388,15 +568,23 @@ export default function App() {
 
       {modalOpen ? (
         <div className="modal" onClick={() => setModalOpen(false)}>
-          <div className="modal-card" onClick={(event) => event.stopPropagation()}>
+          <div
+            className="modal-card"
+            onClick={(event) => event.stopPropagation()}
+          >
             <h2>批量下发配置</h2>
-            <div className="helper">请粘贴 JSON 配置，将覆盖所选设备本地配置。</div>
+            <div className="helper">
+              请粘贴 JSON 配置，将覆盖所选设备本地配置。
+            </div>
             <textarea
               value={configText}
               onChange={(event) => setConfigText(event.target.value)}
             />
             <div className="modal-actions">
-              <button className="action-btn secondary" onClick={() => setModalOpen(false)}>
+              <button
+                className="action-btn secondary"
+                onClick={() => setModalOpen(false)}
+              >
                 取消
               </button>
               <button className="action-btn" onClick={applyBatch}>

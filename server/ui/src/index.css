@@ -21,7 +21,8 @@
 body {
   margin: 0;
   color: var(--ink-1);
-  background: radial-gradient(circle at top right, #fff6ee 0%, transparent 45%),
+  background:
+    radial-gradient(circle at top right, #fff6ee 0%, transparent 45%),
     radial-gradient(circle at 10% 20%, #e7f3ff 0%, transparent 40%),
     linear-gradient(125deg, var(--bg-1), var(--bg-2));
   min-height: 100vh;
@@ -208,6 +209,133 @@ body {
   gap: 16px;
 }
 
+.snapshot-block {
+  display: grid;
+  gap: 12px;
+}
+
+.snapshot-sections {
+  display: grid;
+  gap: 16px;
+}
+
+.platform-card {
+  border-radius: 18px;
+  border: 1px solid rgba(29, 26, 23, 0.12);
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.72);
+  display: grid;
+  gap: 12px;
+}
+
+.platform-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.platform-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.platform-meta {
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.platform-meta strong {
+  color: var(--ink-1);
+}
+
+.platform-badge {
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  background: rgba(224, 122, 95, 0.1);
+  color: var(--accent);
+  border: 1px solid rgba(224, 122, 95, 0.25);
+}
+
+.provider-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.provider-card {
+  border-radius: 16px;
+  border: 1px solid rgba(29, 26, 23, 0.12);
+  background: rgba(255, 255, 255, 0.9);
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.provider-card.current {
+  border-color: rgba(224, 122, 95, 0.6);
+  box-shadow: 0 12px 24px rgba(224, 122, 95, 0.12);
+}
+
+.provider-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.provider-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.provider-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--accent-2);
+  box-shadow: 0 0 0 5px rgba(61, 107, 90, 0.12);
+}
+
+.provider-name {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.provider-id {
+  font-size: 11px;
+  color: var(--ink-2);
+  word-break: break-all;
+}
+
+.status-pill {
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  padding: 2px 8px;
+}
+
+.provider-meta {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.code-block {
+  background: rgba(22, 20, 18, 0.92);
+  color: #f0ebe6;
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 11px;
+  line-height: 1.5;
+  max-height: 220px;
+  overflow: auto;
+}
+
 .detail-row {
   display: grid;
   grid-template-columns: 140px 1fr;
@@ -220,6 +348,36 @@ body {
   color: var(--ink-2);
 }
 
+.copy-btn {
+  border: 1px solid rgba(29, 26, 23, 0.15);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.6);
+  color: var(--ink-1);
+  font-weight: 600;
+}
+
+.copy-btn.light {
+  background: rgba(61, 107, 90, 0.12);
+  border-color: rgba(61, 107, 90, 0.3);
+  color: var(--accent-2);
+}
+
+.raw-toggle {
+  border-radius: 14px;
+  border: 1px dashed rgba(29, 26, 23, 0.18);
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.65);
+}
+
+.raw-toggle summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--accent-2);
+}
+
 .json-block {
   background: rgba(22, 20, 18, 0.9);
   color: #f0ebe6;
@@ -229,16 +387,6 @@ body {
   line-height: 1.5;
   max-height: 320px;
   overflow: auto;
-}
-
-.copy-btn {
-  border: none;
-  border-radius: 10px;
-  padding: 6px 10px;
-  font-size: 12px;
-  cursor: pointer;
-  background: rgba(255, 255, 255, 0.1);
-  color: #f0ebe6;
 }
 
 .modal {
