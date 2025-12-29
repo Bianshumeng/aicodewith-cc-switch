@@ -5,6 +5,7 @@ use machine_uid::get as get_machine_uid;
 use once_cell::sync::Lazy;
 use sha2::{Digest, Sha256};
 use std::time::Duration;
+use tauri::Manager;
 
 use crate::app_config::AppType;
 use crate::error::AppError;
