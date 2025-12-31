@@ -38,11 +38,11 @@ export const geminiProviderPresets: GeminiProviderPreset[] = [
     settingsConfig: {
       env: {
         GOOGLE_GEMINI_BASE_URL: "https://api.aicodewith.com/gemini_cli",
-        GEMINI_MODEL: "gemini-3-pro-preview",
+        GEMINI_MODEL: "gemini-3-pro-high",
       },
     },
     baseURL: "https://api.aicodewith.com/gemini_cli",
-    model: "gemini-3-pro-preview",
+    model: "gemini-3-pro-high",
     description: "AI Code With",
     category: "third_party",
     endpointCandidates: ["https://api.aicodewith.com/gemini_cli"],

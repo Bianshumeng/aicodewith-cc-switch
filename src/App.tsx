@@ -71,6 +71,9 @@ function App() {
     }
   }, [editingProvider]);
 
+  const resolvedEditingProvider =
+    editingProvider ?? lastEditingProviderRef.current;
+
   const promptPanelRef = useRef<any>(null);
   const mcpPanelRef = useRef<any>(null);
   const skillsPageRef = useRef<any>(null);
@@ -288,7 +291,27 @@ function App() {
   };
 
   const handleQuickApplyProvider = async (provider: Omit<Provider, "id">) => {
-    const createdProvider = await addProvider(provider);
+    const baseName = provider.name?.trim() ?? "";
+    const existingNames = new Set(
+      Object.values(providers)
+        .map((item) => item.name?.trim())
+        .filter(Boolean) as string[],
+    );
+    const resolvedName = (() => {
+      if (!baseName || !existingNames.has(baseName)) {
+        return baseName || provider.name;
+      }
+      let index = 2;
+      while (existingNames.has(`${baseName} ${index}`)) {
+        index += 1;
+      }
+      return `${baseName} ${index}`;
+    })();
+
+    const createdProvider = await addProvider({
+      ...provider,
+      name: resolvedName ?? provider.name,
+    });
     if (!createdProvider) return;
     await switchProvider(createdProvider);
   };
@@ -642,7 +665,7 @@ function App() {
 
       <EditProviderDialog
         open={Boolean(editingProvider)}
-        provider={lastEditingProviderRef.current}
+        provider={resolvedEditingProvider}
         onOpenChange={(open) => {
           if (!open) {
             setEditingProvider(null);
