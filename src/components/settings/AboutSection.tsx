@@ -20,9 +20,9 @@ interface ToolVersion {
   error: string | null;
 }
 
-const ONE_CLICK_INSTALL_COMMANDS = `npm i -g @anthropic-ai/claude-code@latest
-npm i -g @openai/codex@latest
-npm i -g @google/gemini-cli@latest`;
+const ONE_CLICK_INSTALL_COMMANDS = `npm i -g @anthropic-ai/claude-code@latest --registry=https://registry.npmmirror.com/
+npm i -g @openai/codex@latest --registry=https://registry.npmmirror.com/
+npm i -g @google/gemini-cli@latest --registry=https://registry.npmmirror.com/`;
 
 export function AboutSection() {
   const { t } = useTranslation();

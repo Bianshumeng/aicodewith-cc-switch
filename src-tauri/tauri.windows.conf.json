@@ -4,6 +4,7 @@
     "windows": [
       {
         "label": "main",
+        "title": "AiCodeWith",
         "titleBarStyle": "Visible",
         "minWidth": 900,
         "minHeight": 600
