@@ -67,4 +67,3 @@ export function getGeminiPresetByUrl(
       url.toLowerCase().includes(preset.baseURL.toLowerCase()),
   );
 }
-

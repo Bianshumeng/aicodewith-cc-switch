@@ -42,7 +42,10 @@ const buildCustomEndpoints = (
   if (!urls || urls.length === 0) return undefined;
 
   const urlSet = new Set<string>();
-  urls.map(normalizeUrl).filter(Boolean).forEach((url) => urlSet.add(url));
+  urls
+    .map(normalizeUrl)
+    .filter(Boolean)
+    .forEach((url) => urlSet.add(url));
   if (urlSet.size === 0) return undefined;
 
   const now = Date.now();

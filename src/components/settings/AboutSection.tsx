@@ -6,12 +6,23 @@ import {
   Terminal,
   CheckCircle2,
   AlertCircle,
+  Download,
+  ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { settingsApi } from "@/lib/api";
 import { motion } from "framer-motion";
+import { getCurrentVersion } from "@/lib/updater";
+import type { Pan123ReleaseAsset } from "@/lib/pan123Update";
+import {
+  compareSemver,
+  fetchPan123DownloadUrl,
+  fetchPan123LatestRelease,
+  getCurrentPan123Platform,
+  getPan123SharePageUrl,
+} from "@/lib/pan123Update";
 
 interface ToolVersion {
   name: string;
@@ -28,6 +39,15 @@ export function AboutSection() {
   const { t } = useTranslation();
   const [toolVersions, setToolVersions] = useState<ToolVersion[]>([]);
   const [isLoadingTools, setIsLoadingTools] = useState(true);
+  const [appVersion, setAppVersion] = useState("");
+  const [latestVersion, setLatestVersion] = useState<string | null>(null);
+  const [platformAsset, setPlatformAsset] = useState<Pan123ReleaseAsset | null>(
+    null,
+  );
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
+  const [updateError, setUpdateError] = useState<string | null>(null);
+  const [isInstalling, setIsInstalling] = useState(false);
+  const [hasUpdate, setHasUpdate] = useState(false);
 
   const loadToolVersions = useCallback(async () => {
     setIsLoadingTools(true);
@@ -45,6 +65,52 @@ export function AboutSection() {
     void loadToolVersions();
   }, [loadToolVersions]);
 
+  const checkPanUpdate = useCallback(async () => {
+    setIsCheckingUpdate(true);
+    setUpdateError(null);
+
+    try {
+      const [current, latest] = await Promise.all([
+        getCurrentVersion(),
+        fetchPan123LatestRelease({ timeoutMs: 15000 }),
+      ]);
+
+      setAppVersion(current);
+      if (!latest) {
+        setLatestVersion(null);
+        setPlatformAsset(null);
+        setHasUpdate(false);
+        setUpdateError(t("settings.panUpdateNoAssets"));
+        return;
+      }
+
+      setLatestVersion(latest.latestVersion);
+
+      const platform = getCurrentPan123Platform();
+      setPlatformAsset(platform ? (latest.assets[platform] ?? null) : null);
+
+      if (!current) {
+        setHasUpdate(false);
+        return;
+      }
+      setHasUpdate(compareSemver(current, latest.latestVersion) < 0);
+    } catch (error) {
+      console.error("[AboutSection] Failed to check pan update", error);
+      setHasUpdate(false);
+      setUpdateError(
+        error instanceof Error
+          ? error.message
+          : t("settings.checkUpdateFailed"),
+      );
+    } finally {
+      setIsCheckingUpdate(false);
+    }
+  }, [t]);
+
+  useEffect(() => {
+    void checkPanUpdate();
+  }, [checkPanUpdate]);
+
   const handleCopyInstallCommands = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(ONE_CLICK_INSTALL_COMMANDS);
@@ -54,6 +120,59 @@ export function AboutSection() {
       toast.error(t("settings.installCommandsCopyFailed"));
     }
   }, [t]);
+
+  const handleOpenPanShare = useCallback(async () => {
+    try {
+      await settingsApi.openExternal(getPan123SharePageUrl());
+    } catch (error) {
+      console.error("[AboutSection] Failed to open pan share page", error);
+      toast.error(t("settings.openPanShareFailed"));
+    }
+  }, [t]);
+
+  const handleDirectDownload = useCallback(async () => {
+    if (!platformAsset) {
+      toast.error(t("settings.panUpdateNoPlatformAsset"));
+      return;
+    }
+
+    try {
+      const downloadUrl = await fetchPan123DownloadUrl(platformAsset.file, {
+        timeoutMs: 15000,
+      });
+      await settingsApi.openExternal(downloadUrl);
+    } catch (error) {
+      console.error("[AboutSection] Failed to open pan download url", error);
+      toast.error(t("settings.openPanDownloadFailed"));
+    }
+  }, [platformAsset, t]);
+
+  const handleDownloadAndInstall = useCallback(async () => {
+    if (!platformAsset) {
+      toast.error(t("settings.panUpdateNoPlatformAsset"));
+      return;
+    }
+
+    setIsInstalling(true);
+    try {
+      const downloadUrl = await fetchPan123DownloadUrl(platformAsset.file, {
+        timeoutMs: 15000,
+      });
+      const result = await settingsApi.downloadAndOpenUpdatePackage({
+        url: downloadUrl,
+        fileName: platformAsset.file.FileName,
+      });
+      toast.success(t("settings.panInstallStarted"), {
+        closeButton: true,
+        description: result.filePath,
+      });
+    } catch (error) {
+      console.error("[AboutSection] Failed to download/install update", error);
+      toast.error(t("settings.panInstallFailed"));
+    } finally {
+      setIsInstalling(false);
+    }
+  }, [platformAsset, t]);
 
   return (
     <motion.section
@@ -82,6 +201,122 @@ export function AboutSection() {
           {t("settings.openSourceNoticeBody")}
         </p>
       </motion.div>
+
+      <div className="space-y-3">
+        <div className="flex items-center justify-between px-1">
+          <h3 className="text-sm font-medium">
+            {t("settings.panUpdateTitle")}
+          </h3>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 gap-1.5 text-xs"
+            onClick={checkPanUpdate}
+            disabled={isCheckingUpdate}
+          >
+            <RefreshCw
+              className={
+                isCheckingUpdate ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"
+              }
+            />
+            {isCheckingUpdate
+              ? t("settings.checking")
+              : t("settings.checkForUpdates")}
+          </Button>
+        </div>
+
+        <div className="rounded-xl border border-border bg-gradient-to-br from-card/80 to-card/40 p-4 space-y-3 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-muted-foreground">
+              {t("settings.currentAppVersion")}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-mono text-muted-foreground">
+                {appVersion ? `v${appVersion}` : t("common.unknown")}
+              </span>
+              {!updateError && latestVersion ? (
+                hasUpdate ? (
+                  <AlertCircle className="h-4 w-4 text-yellow-500" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                )
+              ) : updateError ? (
+                <AlertCircle className="h-4 w-4 text-red-500" />
+              ) : (
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-muted-foreground">
+              {t("settings.panLatestVersion")}
+            </div>
+            <div className="text-xs font-mono text-muted-foreground">
+              {latestVersion ? `v${latestVersion}` : t("common.unknown")}
+            </div>
+          </div>
+
+          {platformAsset ? (
+            <div className="text-[10px] text-muted-foreground font-mono truncate">
+              {platformAsset.file.FileName}
+            </div>
+          ) : null}
+
+          {updateError ? (
+            <p className="text-xs text-red-500">{updateError}</p>
+          ) : hasUpdate ? (
+            <p className="text-xs text-muted-foreground">
+              {t("settings.updateAvailable", { version: latestVersion })}
+            </p>
+          ) : latestVersion ? (
+            <p className="text-xs text-muted-foreground">
+              {t("settings.upToDate")}
+            </p>
+          ) : null}
+
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1.5 text-xs"
+              onClick={handleOpenPanShare}
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+              {t("settings.openPanShare")}
+            </Button>
+
+            {platformAsset ? (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 gap-1.5 text-xs"
+                  onClick={handleDirectDownload}
+                  disabled={!latestVersion}
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  {t("settings.panDirectDownload")}
+                </Button>
+
+                <Button
+                  size="sm"
+                  className="h-8 gap-1.5 text-xs"
+                  onClick={handleDownloadAndInstall}
+                  disabled={isInstalling || !latestVersion}
+                >
+                  {isInstalling ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Download className="h-3.5 w-3.5" />
+                  )}
+                  {t("settings.panDownloadAndInstall")}
+                </Button>
+              </>
+            ) : null}
+          </div>
+        </div>
+      </div>
 
       <div className="space-y-3">
         <div className="flex items-center justify-between px-1">

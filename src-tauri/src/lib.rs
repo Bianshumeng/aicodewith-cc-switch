@@ -232,6 +232,13 @@ pub fn run() {
                 )?;
             }
 
+            // 修正桌面端窗口标题显示（部分环境下会显示为默认值或内部标识）
+            if let Some(window) = app.handle().get_webview_window("main") {
+                if let Err(err) = window.set_title("AiCodeWith") {
+                    log::warn!("设置窗口标题失败: {err}");
+                }
+            }
+
             // 预先刷新 Store 覆盖配置，确保 AppState 初始化时可读取到最新路径
             app_store::refresh_app_config_dir_override(app.handle());
 
@@ -565,6 +572,7 @@ pub fn run() {
             commands::open_config_folder,
             commands::pick_directory,
             commands::open_external,
+            commands::download_and_open_update_package,
             commands::get_init_error,
             commands::get_migration_result,
             commands::get_app_config_path,

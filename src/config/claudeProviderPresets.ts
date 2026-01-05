@@ -62,4 +62,3 @@ export const providerPresets: ProviderPreset[] = [
     iconColor: "#111111",
   },
 ];
-

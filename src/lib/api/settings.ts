@@ -116,6 +116,28 @@ export const settingsApi = {
     await invoke("open_external", { url });
   },
 
+  async downloadAndOpenUpdatePackage(options: {
+    url: string;
+    fileName: string;
+  }): Promise<{ filePath: string }> {
+    const { url, fileName } = options;
+    try {
+      const u = new URL(url);
+      const scheme = u.protocol.replace(":", "").toLowerCase();
+      if (scheme !== "http" && scheme !== "https") {
+        throw new Error("Unsupported URL scheme");
+      }
+    } catch {
+      throw new Error("Invalid URL");
+    }
+
+    if (!fileName.trim()) {
+      throw new Error("Invalid fileName");
+    }
+
+    return await invoke("download_and_open_update_package", { url, fileName });
+  },
+
   async setAutoLaunch(enabled: boolean): Promise<boolean> {
     return await invoke("set_auto_launch", { enabled });
   },
