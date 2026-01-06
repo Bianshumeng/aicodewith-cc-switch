@@ -572,6 +572,7 @@ pub fn run() {
             commands::open_config_folder,
             commands::pick_directory,
             commands::open_external,
+            commands::get_runtime_platform,
             commands::download_and_open_update_package,
             commands::get_init_error,
             commands::get_migration_result,

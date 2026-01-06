@@ -116,6 +116,10 @@ export const settingsApi = {
     await invoke("open_external", { url });
   },
 
+  async getRuntimePlatform(): Promise<"windows" | "macos" | "linux"> {
+    return await invoke("get_runtime_platform");
+  },
+
   async downloadAndOpenUpdatePackage(options: {
     url: string;
     fileName: string;

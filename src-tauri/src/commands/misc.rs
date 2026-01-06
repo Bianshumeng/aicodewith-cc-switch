@@ -29,6 +29,14 @@ pub async fn open_external(app: AppHandle, url: String) -> Result<bool, String> 
     Ok(true)
 }
 
+/// 获取当前运行平台（用于前端按系统选择安装包）。
+///
+/// 返回值与前端 `Pan123Platform` 对齐：`windows` / `macos` / `linux`。
+#[tauri::command]
+pub async fn get_runtime_platform() -> Result<String, String> {
+    Ok(std::env::consts::OS.to_string())
+}
+
 #[derive(serde::Serialize)]
 pub struct DownloadAndOpenResult {
     filePath: String,

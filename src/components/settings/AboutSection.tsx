@@ -86,7 +86,9 @@ export function AboutSection() {
 
       setLatestVersion(latest.latestVersion);
 
-      const platform = getCurrentPan123Platform();
+      const platform = await settingsApi
+        .getRuntimePlatform()
+        .catch(() => getCurrentPan123Platform());
       setPlatformAsset(platform ? (latest.assets[platform] ?? null) : null);
 
       if (!current) {

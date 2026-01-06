@@ -1,3 +1,5 @@
+import { getDesktopPlatform } from "@/lib/platform";
+
 export type Pan123Platform = "windows" | "macos" | "linux";
 
 export interface Pan123ShareFile {
@@ -155,11 +157,26 @@ export async function fetchPan123DownloadUrl(
   return `${json.data.dispatchList[0].prefix}${json.data.downloadPath}`;
 }
 
+// 说明：网盘文件名通常类似：`AI-Code-With-v1.0.3-Windows.msi` / `...-macOS.zip`。
+// 这里的 `-Windows/.msi` 属于“平台/产物信息”，不是 SemVer 的 prerelease。
+// 因此先粗略截取 `v...` 后的片段，再做清洗（去平台/去扩展名），最终得到纯 SemVer 版本号。
 const VERSION_IN_FILENAME_RE = /\bv(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)\b/i;
 
 export function extractVersionFromFileName(fileName: string): string | null {
   const match = fileName.match(VERSION_IN_FILENAME_RE);
-  return match?.[1] ?? null;
+  if (!match?.[1]) return null;
+
+  let version = match[1];
+
+  // 先去掉常见扩展名（包含多段扩展名）
+  version = version.replace(/\.tar\.gz$/i, "");
+  version = version.replace(/\.(msi|exe|zip|dmg|pkg|deb|appimage)$/i, "");
+
+  // 再去掉文件名中紧随版本号的“平台/架构标识”（例如 `-Windows` / `-Windows-x64`）。
+  // 这里不强依赖特定命名模板，只要后缀以平台名结尾即可。
+  version = version.replace(/-(windows|macos|linux)(?:[-._][0-9a-z]+)*$/i, "");
+
+  return version;
 }
 
 function parseSemver(version: string): {
@@ -219,15 +236,7 @@ export function compareSemver(a: string, b: string): number {
 }
 
 export function getCurrentPan123Platform(): Pan123Platform | null {
-  try {
-    const ua = navigator.userAgent || "";
-    if (/windows|win32|win64/i.test(ua)) return "windows";
-    if (/mac/i.test(ua)) return "macos";
-    if (/linux|x11/i.test(ua) && !/android/i.test(ua)) return "linux";
-    return null;
-  } catch {
-    return null;
-  }
+  return getDesktopPlatform();
 }
 
 function inferPlatformFromFileName(fileName: string): Pan123Platform | null {

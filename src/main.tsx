@@ -9,6 +9,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "@/components/theme-provider";
 import { queryClient } from "@/lib/query";
 import { Toaster } from "@/components/ui/sonner";
+import { isMac } from "@/lib/platform";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { message } from "@tauri-apps/plugin-dialog";
@@ -16,10 +17,7 @@ import { exit } from "@tauri-apps/plugin-process";
 
 // 根据平台添加 body class，便于平台特定样式
 try {
-  const ua = navigator.userAgent || "";
-  const plat = (navigator.platform || "").toLowerCase();
-  const isMac = /mac/i.test(ua) || plat.includes("mac");
-  if (isMac) {
+  if (isMac()) {
     document.body.classList.add("is-mac");
   }
 } catch {
