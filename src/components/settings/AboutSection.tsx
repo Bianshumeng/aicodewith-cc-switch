@@ -15,6 +15,8 @@ import { toast } from "sonner";
 import { settingsApi } from "@/lib/api";
 import { motion } from "framer-motion";
 import { getCurrentVersion } from "@/lib/updater";
+import { confirm } from "@tauri-apps/plugin-dialog";
+import { exit } from "@tauri-apps/plugin-process";
 import type { Pan123ReleaseAsset } from "@/lib/pan123Update";
 import {
   compareSemver,
@@ -155,6 +157,16 @@ export function AboutSection() {
       return;
     }
 
+    const isWindowsMsi =
+      platformAsset.file.FileName.toLowerCase().endsWith(".msi");
+    if (isWindowsMsi) {
+      const ok = await confirm(t("settings.panInstallConfirmBody"), {
+        title: t("settings.panInstallConfirmTitle"),
+        kind: "warning",
+      });
+      if (!ok) return;
+    }
+
     setIsInstalling(true);
     try {
       const downloadUrl = await fetchPan123DownloadUrl(platformAsset.file, {
@@ -168,6 +180,13 @@ export function AboutSection() {
         closeButton: true,
         description: result.filePath,
       });
+
+      if (isWindowsMsi) {
+        toast.message(t("settings.panInstallExitHint"), { closeButton: true });
+        setTimeout(() => {
+          void exit(0);
+        }, 800);
+      }
     } catch (error) {
       console.error("[AboutSection] Failed to download/install update", error);
       toast.error(t("settings.panInstallFailed"));

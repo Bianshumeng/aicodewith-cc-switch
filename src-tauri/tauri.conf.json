@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "AI Code With",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "identifier": "com.aicodewith.desktop",
   "build": {
     "frontendDist": "../dist",
@@ -46,7 +46,12 @@
     ],
     "windows": {
       "wix": {
-        "template": "wix/per-user-main.wxs"
+        "template": "wix/per-user-main.wxs",
+        "language": {
+          "zh-CN": {
+            "localePath": "wix/locales/zh-CN.wxl"
+          }
+        }
       }
     },
     "macOS": {

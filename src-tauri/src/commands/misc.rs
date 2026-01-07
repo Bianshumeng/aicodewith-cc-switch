@@ -65,6 +65,26 @@ fn sanitize_download_file_name(raw: &str) -> String {
     }
 }
 
+#[cfg(target_os = "windows")]
+fn try_start_windows_msi_install(msi_path: &std::path::Path) -> Result<(), String> {
+    use std::process::Command;
+
+    // 业务约束：更新按钮触发的安装应尽量减少交互，避免“向导式安装页”打断用户。
+    // 技术约束：MSI 本身无法在双击时强制静默；但应用内触发安装可以通过 `msiexec` 参数做到。
+    Command::new("msiexec")
+        .arg("/i")
+        .arg(msi_path)
+        .arg("/passive")
+        .arg("/norestart")
+        // 配合 `src-tauri/wix/per-user-main.wxs` 的自定义动作：安装完成后自动启动应用。
+        .arg("AUTOLAUNCHAPP=1")
+        .creation_flags(CREATE_NO_WINDOW)
+        .spawn()
+        .map_err(|e| format!("启动 Windows 安装器失败: {e}"))?;
+
+    Ok(())
+}
+
 /// 下载网盘安装包并打开（触发系统安装流程）
 #[tauri::command]
 pub async fn download_and_open_update_package(
@@ -131,6 +151,21 @@ pub async fn download_and_open_update_package(
     if let Err(e) = tokio::fs::rename(&temp_path, &final_path).await {
         let _ = tokio::fs::remove_file(&temp_path).await;
         return Err(format!("保存下载文件失败: {e}"));
+    }
+
+    // Windows 下如果是 MSI，则用 msiexec 的 passive 模式启动安装，以避免向导式安装页面。
+    #[cfg(target_os = "windows")]
+    {
+        if final_path
+            .extension()
+            .and_then(|v| v.to_str())
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("msi"))
+        {
+            try_start_windows_msi_install(&final_path)?;
+            return Ok(DownloadAndOpenResult {
+                filePath: final_path.to_string_lossy().to_string(),
+            });
+        }
     }
 
     app.opener()
