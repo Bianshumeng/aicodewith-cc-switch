@@ -42,10 +42,11 @@ export interface Pan123LatestRelease {
 }
 
 const PAN123_SOURCE = {
-  shareKey: "ztf6jv-HUc0A",
-  sharePwd: "3FyF",
+  shareKey: "ztf6jv-Abc0A",
+  sharePwd: "",
   apiBaseUrl: "https://www.123865.com/b/api",
-  sharePageUrl: "https://www.123865.com/s/ztf6jv-HUc0A?pwd=3FyF#",
+  sharePageUrl: "https://www.123865.com/s/ztf6jv-Abc0A",
+  defaultFolderName: "直链空间",
 } as const;
 
 export function getPan123SharePageUrl(): string {
@@ -76,7 +77,8 @@ async function fetchJson<T>(input: RequestInfo | URL, init?: RequestInit) {
   return (await res.json()) as T;
 }
 
-export async function fetchPan123ShareFiles(options?: {
+async function fetchPan123ShareList(options: {
+  parentFileId: number;
   timeoutMs?: number;
 }): Promise<Pan123ShareFile[]> {
   const url = new URL(`${PAN123_SOURCE.apiBaseUrl}/share/get`);
@@ -85,14 +87,14 @@ export async function fetchPan123ShareFiles(options?: {
     next: "0",
     orderBy: "file_name",
     orderDirection: "asc",
-    ParentFileId: "0",
+    ParentFileId: String(options.parentFileId),
     Page: "1",
     OrderId: "",
     SharePwd: PAN123_SOURCE.sharePwd,
     shareKey: PAN123_SOURCE.shareKey,
   }).toString();
 
-  const timeoutMs = options?.timeoutMs ?? 15000;
+  const timeoutMs = options.timeoutMs ?? 15000;
   const { signal, cleanup } = createTimeoutSignal(timeoutMs);
 
   let json: Pan123ShareGetResponse;
@@ -115,6 +117,26 @@ export async function fetchPan123ShareFiles(options?: {
 
   const list = json.data?.InfoList;
   return Array.isArray(list) ? list : [];
+}
+
+export async function fetchPan123ShareFiles(options?: {
+  timeoutMs?: number;
+}): Promise<Pan123ShareFile[]> {
+  const rootFiles = await fetchPan123ShareList({
+    parentFileId: 0,
+    timeoutMs: options?.timeoutMs,
+  });
+  const folder = rootFiles.find(
+    (item) =>
+      item.Type === 1 && item.FileName === PAN123_SOURCE.defaultFolderName,
+  );
+  if (!folder) return rootFiles;
+
+  const folderFiles = await fetchPan123ShareList({
+    parentFileId: folder.FileId,
+    timeoutMs: options?.timeoutMs,
+  });
+  return folderFiles.length > 0 ? folderFiles : rootFiles;
 }
 
 export async function fetchPan123DownloadUrl(
