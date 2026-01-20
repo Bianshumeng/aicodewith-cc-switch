@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { providersApi, settingsApi, type AppId } from "@/lib/api";
 import { syncCurrentProvidersLiveSafe } from "@/utils/postChangeSync";
+import { resolveClaudePluginSyncAction } from "@/utils/claudePluginSync";
 import { useSettingsQuery, useSaveSettingsMutation } from "@/lib/query";
 import type { Settings } from "@/types";
 import { useSettingsForm, type SettingsFormState } from "./useSettingsForm";
@@ -101,6 +102,47 @@ export function useSettings(): UseSettingsResult {
     setRequiresRestart,
   } = useSettingsMetadata();
 
+  const syncClaudePluginIntegration = useCallback(
+    async (enabled: boolean) => {
+      try {
+        if (!enabled) {
+          await settingsApi.applyClaudePluginConfig({ official: true });
+          return;
+        }
+
+        const currentProviderId = await providersApi.getCurrent("claude");
+        const providers = await providersApi.getAll("claude");
+        const currentProvider = providers[currentProviderId];
+
+        if (!currentProvider) {
+          throw new Error("当前 Claude 供应商不存在");
+        }
+
+        const action = resolveClaudePluginSyncAction({
+          enabled,
+          isOfficial: currentProvider.category === "official",
+        });
+
+        if (action === "write") {
+          await settingsApi.applyClaudePluginConfig({ official: false });
+        } else if (action === "clear") {
+          await settingsApi.applyClaudePluginConfig({ official: true });
+        }
+      } catch (error) {
+        console.warn(
+          "[useSettings] Failed to sync Claude plugin config",
+          error,
+        );
+        toast.error(
+          t("notifications.syncClaudePluginFailed", {
+            defaultValue: "同步 Claude 插件失败",
+          }),
+        );
+      }
+    },
+    [t],
+  );
+
   // 重置设置
   const resetSettings = useCallback(() => {
     resetForm(data ?? null);
@@ -121,7 +163,7 @@ export function useSettings(): UseSettingsResult {
   ]);
 
   // 即时保存设置（用于 General 标签页的实时更新）
-  // 保存基础配置 + 独立的系统 API 调用（开机自启）
+  // 保存基础配置 + 独立的系统 API 调用（开机自启、插件联动、跳过初次确认）
   const autoSaveSettings = useCallback(
     async (updates: Partial<SettingsFormState>): Promise<SaveResult | null> => {
       const mergedSettings = settings ? { ...settings, ...updates } : null;
@@ -190,6 +232,16 @@ export function useSettings(): UseSettingsResult {
           }
         }
 
+        const nextEnableClaudePluginIntegration =
+          updates.enableClaudePluginIntegration;
+        if (
+          nextEnableClaudePluginIntegration !== undefined &&
+          nextEnableClaudePluginIntegration !==
+            (data?.enableClaudePluginIntegration ?? false)
+        ) {
+          await syncClaudePluginIntegration(nextEnableClaudePluginIntegration);
+        }
+
         // 持久化语言偏好
         try {
           if (typeof window !== "undefined" && updates.language) {
@@ -221,7 +273,7 @@ export function useSettings(): UseSettingsResult {
         throw error;
       }
     },
-    [data, saveMutation, settings, t],
+    [data, saveMutation, settings, syncClaudePluginIntegration, t],
   );
 
   // 完整保存设置（用于 Advanced 标签页的手动保存）
@@ -305,23 +357,9 @@ export function useSettings(): UseSettingsResult {
           payload.enableClaudePluginIntegration !==
             data?.enableClaudePluginIntegration
         ) {
-          try {
-            if (payload.enableClaudePluginIntegration) {
-              await settingsApi.applyClaudePluginConfig({ official: false });
-            } else {
-              await settingsApi.applyClaudePluginConfig({ official: true });
-            }
-          } catch (error) {
-            console.warn(
-              "[useSettings] Failed to sync Claude plugin config",
-              error,
-            );
-            toast.error(
-              t("notifications.syncClaudePluginFailed", {
-                defaultValue: "同步 Claude 插件失败",
-              }),
-            );
-          }
+          await syncClaudePluginIntegration(
+            payload.enableClaudePluginIntegration,
+          );
         }
 
         try {
@@ -390,6 +428,7 @@ export function useSettings(): UseSettingsResult {
       settings,
       setRequiresRestart,
       t,
+      syncClaudePluginIntegration,
     ],
   );
 

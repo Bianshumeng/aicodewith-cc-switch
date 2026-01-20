@@ -11,6 +11,7 @@ import {
   useSwitchProviderMutation,
 } from "@/lib/query";
 import { extractErrorMessage } from "@/utils/errorUtils";
+import { resolveClaudePluginSyncAction } from "@/utils/claudePluginSync";
 
 /**
  * Hook for managing provider actions (add, update, delete, switch)
@@ -36,8 +37,16 @@ export function useProviderActions(activeApp: AppId) {
           return;
         }
 
-        const isOfficial = provider.category === "official";
-        await settingsApi.applyClaudePluginConfig({ official: isOfficial });
+        const action = resolveClaudePluginSyncAction({
+          enabled: true,
+          isOfficial: provider.category === "official",
+        });
+
+        if (action !== "write") {
+          return;
+        }
+
+        await settingsApi.applyClaudePluginConfig({ official: false });
 
         // 静默执行，不显示成功通知
       } catch (error) {

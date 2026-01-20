@@ -3,10 +3,11 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { homeDir, join } from "@tauri-apps/api/path";
 import { Button } from "@/components/ui/button";
 import { Form, FormField, FormItem, FormMessage } from "@/components/ui/form";
 import { providerSchema, type ProviderFormData } from "@/lib/schemas/provider";
-import type { AppId } from "@/lib/api";
+import { providersApi, settingsApi, type AppId } from "@/lib/api";
 import type { ProviderCategory, ProviderMeta } from "@/types";
 import {
   providerPresets,
@@ -22,6 +23,9 @@ import {
 } from "@/config/geminiProviderPresets";
 import { applyTemplateValues } from "@/utils/providerConfigUtils";
 import { mergeProviderMeta } from "@/utils/providerMetaUtils";
+import { resolveClaudePluginSyncAction } from "@/utils/claudePluginSync";
+import { extractErrorMessage } from "@/utils/errorUtils";
+import { useSettingsQuery, useSaveSettingsMutation } from "@/lib/query";
 import { getCodexCustomTemplate } from "@/config/codexTemplates";
 import CodexConfigEditor from "./CodexConfigEditor";
 import { CommonConfigEditor } from "./CommonConfigEditor";
@@ -35,7 +39,6 @@ import {
   useProviderCategory,
   useApiKeyState,
   useBaseUrlState,
-  useModelState,
   useCodexConfigState,
   useApiKeyLink,
   useTemplateValues,
@@ -96,6 +99,8 @@ export function ProviderForm({
 }: ProviderFormProps) {
   const { t } = useTranslation();
   const isEditMode = Boolean(initialData);
+  const { data: settings } = useSettingsQuery();
+  const saveSettingsMutation = useSaveSettingsMutation();
 
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(
     initialData ? null : "custom",
@@ -119,6 +124,13 @@ export function ProviderForm({
       return [];
     },
   );
+  const [claudePluginConfigPath, setClaudePluginConfigPath] =
+    useState<string>("");
+  const [isClaudePluginPathLoading, setIsClaudePluginPathLoading] =
+    useState(false);
+  const [isClaudePluginSyncing, setIsClaudePluginSyncing] = useState(false);
+  const [pluginIntegrationEnabled, setPluginIntegrationEnabled] =
+    useState(false);
 
   // 使用 category hook
   const { category } = useProviderCategory({
@@ -137,6 +149,10 @@ export function ProviderForm({
       setDraftCustomEndpoints([]);
     }
   }, [appId, initialData]);
+
+  useEffect(() => {
+    setPluginIntegrationEnabled(!!settings?.enableClaudePluginIntegration);
+  }, [settings?.enableClaudePluginIntegration]);
 
   const defaultValues: ProviderFormData = useMemo(
     () => ({
@@ -187,18 +203,6 @@ export function ProviderForm({
     },
   });
 
-  // 使用 Model hook（新：主模型 + Haiku/Sonnet/Opus 默认模型）
-  const {
-    claudeModel,
-    defaultHaikuModel,
-    defaultSonnetModel,
-    defaultOpusModel,
-    handleModelChange,
-  } = useModelState({
-    settingsConfig: form.watch("settingsConfig"),
-    onConfigChange: (config) => form.setValue("settingsConfig", config),
-  });
-
   // 使用 Codex 配置 hook (仅 Codex 模式)
   const {
     codexAuth,
@@ -239,6 +243,88 @@ export function ProviderForm({
   useEffect(() => {
     form.reset(defaultValues);
   }, [defaultValues, form]);
+
+  useEffect(() => {
+    if (appId !== "claude") return;
+
+    let active = true;
+    setIsClaudePluginPathLoading(true);
+
+    const ensurePath = async () => {
+      try {
+        const configDir = await settingsApi.getConfigDir("claude");
+        const path = await join(configDir, "config.json");
+        if (active) setClaudePluginConfigPath(path);
+      } catch (error) {
+        try {
+          const home = await homeDir();
+          const fallback = await join(home, ".claude", "config.json");
+          if (active) setClaudePluginConfigPath(fallback);
+        } catch {
+          if (active) setClaudePluginConfigPath("~/.claude/config.json");
+        }
+      } finally {
+        if (active) setIsClaudePluginPathLoading(false);
+      }
+    };
+
+    void ensurePath();
+    return () => {
+      active = false;
+    };
+  }, [appId, settings?.claudeConfigDir]);
+
+  const handleClaudePluginIntegrationToggle = useCallback(
+    async (enabled: boolean) => {
+      if (!settings) return;
+      const previous = pluginIntegrationEnabled;
+
+      setPluginIntegrationEnabled(enabled);
+      setIsClaudePluginSyncing(true);
+
+      try {
+        await saveSettingsMutation.mutateAsync({
+          ...settings,
+          enableClaudePluginIntegration: enabled,
+        });
+
+        const currentProviderId = await providersApi.getCurrent("claude");
+        const providers = await providersApi.getAll("claude");
+        const currentProvider = providers[currentProviderId];
+
+        if (!currentProvider) {
+          throw new Error("当前 Claude 供应商不存在");
+        }
+
+        const action = resolveClaudePluginSyncAction({
+          enabled,
+          isOfficial: currentProvider.category === "official",
+        });
+
+        if (action === "write") {
+          await settingsApi.applyClaudePluginConfig({ official: false });
+        } else if (action === "clear") {
+          await settingsApi.applyClaudePluginConfig({ official: true });
+        }
+      } catch (error) {
+        setPluginIntegrationEnabled(previous);
+        const detail =
+          extractErrorMessage(error) ||
+          t("notifications.syncClaudePluginFailed", {
+            defaultValue: "同步 Claude 插件失败",
+          });
+        toast.error(detail);
+      } finally {
+        setIsClaudePluginSyncing(false);
+      }
+    },
+    [
+      pluginIntegrationEnabled,
+      saveSettingsMutation,
+      settings,
+      t,
+    ],
+  );
 
   const presetCategoryLabels: Record<string, string> = useMemo(
     () => ({
@@ -787,12 +873,13 @@ export function ProviderForm({
             onCustomEndpointsChange={
               isEditMode ? undefined : setDraftCustomEndpoints
             }
-            shouldShowModelSelector={category !== "official"}
-            claudeModel={claudeModel}
-            defaultHaikuModel={defaultHaikuModel}
-            defaultSonnetModel={defaultSonnetModel}
-            defaultOpusModel={defaultOpusModel}
-            onModelChange={handleModelChange}
+            pluginIntegrationEnabled={pluginIntegrationEnabled}
+            pluginConfigPath={claudePluginConfigPath}
+            isPluginConfigPathLoading={isClaudePluginPathLoading}
+            isPluginIntegrationDisabled={
+              !settings || isClaudePluginSyncing
+            }
+            onPluginIntegrationToggle={handleClaudePluginIntegrationToggle}
             speedTestEndpoints={speedTestEndpoints}
           />
         )}

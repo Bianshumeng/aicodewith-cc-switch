@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { FormLabel } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import EndpointSpeedTest from "./EndpointSpeedTest";
 import { ApiKeySection, EndpointField } from "./shared";
 import type { ProviderCategory } from "@/types";
@@ -36,20 +37,12 @@ interface ClaudeFormFieldsProps {
   onEndpointModalToggle: (open: boolean) => void;
   onCustomEndpointsChange?: (endpoints: string[]) => void;
 
-  // Model Selector
-  shouldShowModelSelector: boolean;
-  claudeModel: string;
-  defaultHaikuModel: string;
-  defaultSonnetModel: string;
-  defaultOpusModel: string;
-  onModelChange: (
-    field:
-      | "ANTHROPIC_MODEL"
-      | "ANTHROPIC_DEFAULT_HAIKU_MODEL"
-      | "ANTHROPIC_DEFAULT_SONNET_MODEL"
-      | "ANTHROPIC_DEFAULT_OPUS_MODEL",
-    value: string,
-  ) => void;
+  // Claude Plugin Integration
+  pluginIntegrationEnabled: boolean;
+  pluginConfigPath: string;
+  isPluginConfigPathLoading: boolean;
+  isPluginIntegrationDisabled: boolean;
+  onPluginIntegrationToggle: (enabled: boolean) => void;
 
   // Speed Test Endpoints
   speedTestEndpoints: EndpointCandidate[];
@@ -75,12 +68,11 @@ export function ClaudeFormFields({
   isEndpointModalOpen,
   onEndpointModalToggle,
   onCustomEndpointsChange,
-  shouldShowModelSelector,
-  claudeModel,
-  defaultHaikuModel,
-  defaultSonnetModel,
-  defaultOpusModel,
-  onModelChange,
+  pluginIntegrationEnabled,
+  pluginConfigPath,
+  isPluginConfigPathLoading,
+  isPluginIntegrationDisabled,
+  onPluginIntegrationToggle,
   speedTestEndpoints,
 }: ClaudeFormFieldsProps) {
   const { t } = useTranslation();
@@ -162,103 +154,66 @@ export function ClaudeFormFields({
         />
       )}
 
-      {/* 模型选择器 */}
-      {shouldShowModelSelector && (
-        <div className="space-y-3">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* 主模型 */}
-            <div className="space-y-2">
-              <FormLabel htmlFor="claudeModel">
-                {t("providerForm.anthropicModel", { defaultValue: "主模型" })}
-              </FormLabel>
-              <Input
-                id="claudeModel"
-                type="text"
-                value={claudeModel}
-                onChange={(e) =>
-                  onModelChange("ANTHROPIC_MODEL", e.target.value)
-                }
-                placeholder={t("providerForm.modelPlaceholder", {
-                  defaultValue: "",
-                })}
-                autoComplete="off"
-              />
-            </div>
+      <div className="space-y-3">
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-1">
+            <FormLabel>
+              {t("settings.enableClaudePluginIntegration", {
+                defaultValue: "应用到 Claude Code 插件",
+              })}
+            </FormLabel>
+            <p className="text-xs text-muted-foreground">
+              {t("settings.enableClaudePluginIntegrationDescription", {
+                defaultValue:
+                  "开启后 Vscode Claude Code 插件的供应商将随本软件切换",
+              })}
+            </p>
+          </div>
+          <Switch
+            checked={pluginIntegrationEnabled}
+            onCheckedChange={onPluginIntegrationToggle}
+            disabled={isPluginIntegrationDisabled}
+            aria-label={t("settings.enableClaudePluginIntegration", {
+              defaultValue: "应用到 Claude Code 插件",
+            })}
+          />
+        </div>
 
-            {/* 默认 Haiku */}
-            <div className="space-y-2">
-              <FormLabel htmlFor="claudeDefaultHaikuModel">
-                {t("providerForm.anthropicDefaultHaikuModel", {
-                  defaultValue: "Haiku 默认模型",
-                })}
-              </FormLabel>
-              <Input
-                id="claudeDefaultHaikuModel"
-                type="text"
-                value={defaultHaikuModel}
-                onChange={(e) =>
-                  onModelChange("ANTHROPIC_DEFAULT_HAIKU_MODEL", e.target.value)
-                }
-                placeholder={t("providerForm.haikuModelPlaceholder", {
-                  defaultValue: "",
-                })}
-                autoComplete="off"
-              />
-            </div>
-
-            {/* 默认 Sonnet */}
-            <div className="space-y-2">
-              <FormLabel htmlFor="claudeDefaultSonnetModel">
-                {t("providerForm.anthropicDefaultSonnetModel", {
-                  defaultValue: "Sonnet 默认模型",
-                })}
-              </FormLabel>
-              <Input
-                id="claudeDefaultSonnetModel"
-                type="text"
-                value={defaultSonnetModel}
-                onChange={(e) =>
-                  onModelChange(
-                    "ANTHROPIC_DEFAULT_SONNET_MODEL",
-                    e.target.value,
-                  )
-                }
-                placeholder={t("providerForm.modelPlaceholder", {
-                  defaultValue: "",
-                })}
-                autoComplete="off"
-              />
-            </div>
-
-            {/* 默认 Opus */}
-            <div className="space-y-2">
-              <FormLabel htmlFor="claudeDefaultOpusModel">
-                {t("providerForm.anthropicDefaultOpusModel", {
-                  defaultValue: "Opus 默认模型",
-                })}
-              </FormLabel>
-              <Input
-                id="claudeDefaultOpusModel"
-                type="text"
-                value={defaultOpusModel}
-                onChange={(e) =>
-                  onModelChange("ANTHROPIC_DEFAULT_OPUS_MODEL", e.target.value)
-                }
-                placeholder={t("providerForm.modelPlaceholder", {
-                  defaultValue: "",
-                })}
-                autoComplete="off"
-              />
-            </div>
+        <div className="space-y-2 rounded-lg border border-border/60 bg-muted/30 p-3">
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">
+              {t("providerForm.claudePluginConfigPath", {
+                defaultValue: "配置路径",
+              })}
+            </p>
+            <p className="text-xs font-mono break-all text-foreground/80">
+              {isPluginConfigPathLoading
+                ? t("providerForm.claudePluginConfigPathLoading", {
+                    defaultValue: "正在读取...",
+                  })
+                : pluginConfigPath}
+            </p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">
+              {t("providerForm.claudePluginConfigContent", {
+                defaultValue: "写入内容",
+              })}
+            </p>
+            <pre className="text-xs font-mono bg-background/80 px-3 py-2 rounded-lg border border-border/60 overflow-x-auto whitespace-pre-wrap">
+{`{
+  "primaryApiKey": "any"
+}`}
+            </pre>
           </div>
           <p className="text-xs text-muted-foreground">
-            {t("providerForm.modelHelper", {
+            {t("providerForm.claudePluginConfigHint", {
               defaultValue:
-                "可选：指定默认使用的 Claude 模型，留空则使用系统默认。",
+                "仅非官方供应商会写入该文件；官方供应商不改写；关闭开关将移除 primaryApiKey。",
             })}
           </p>
         </div>
-      )}
+      </div>
     </>
   );
 }
